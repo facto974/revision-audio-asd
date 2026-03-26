@@ -1,0 +1,293 @@
+/* Main layout */
+.app-container {
+    display: flex;
+    min-height: 100vh;
+    background-color: #FFFFFF;
+}
+
+/* Sidebar */
+.sidebar {
+    width: 280px;
+    border-right: 1px solid #E5E7EB;
+    background-color: #F9FAFB;
+    display: flex;
+    flex-direction: column;
+    position: fixed;
+    top: 0;
+    left: 0;
+    height: 100vh;
+    z-index: 40;
+}
+
+.sidebar-header {
+    padding: 24px;
+    border-bottom: 1px solid #E5E7EB;
+}
+
+.sidebar-nav {
+    flex: 1;
+    overflow-y: auto;
+    padding: 16px 0;
+}
+
+.nav-item {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    padding: 12px 24px;
+    color: #4B5563;
+    cursor: pointer;
+    transition: all 150ms ease-in-out;
+    border-left: 2px solid transparent;
+}
+
+.nav-item:hover {
+    background-color: #F3F4F6;
+}
+
+.nav-item.active {
+    background-color: #EFF6FF;
+    border-left-color: #2563EB;
+    color: #1E3A8A;
+}
+
+.nav-item.completed {
+    color: #16A34A;
+}
+
+/* Main content */
+.main-content {
+    flex: 1;
+    margin-left: 280px;
+    padding-bottom: 100px;
+}
+
+.content-area {
+    max-width: 800px;
+    margin: 0 auto;
+    padding: 48px 32px;
+}
+
+/* Course content styles */
+.section-title {
+    font-family: 'IBM Plex Sans', sans-serif;
+    font-size: 2.5rem;
+    font-weight: 700;
+    color: #0A0A0A;
+    margin-bottom: 32px;
+    letter-spacing: -0.025em;
+}
+
+.content-block {
+    margin-bottom: 24px;
+    line-height: 1.8;
+}
+
+.content-intro {
+    font-size: 1.125rem;
+    color: #4B5563;
+    padding: 20px;
+    background-color: #F9FAFB;
+    border-left: 3px solid #2563EB;
+}
+
+.content-concept {
+    padding: 20px;
+    background-color: #FFFBEB;
+    border: 1px solid #FCD34D;
+}
+
+.content-method {
+    padding: 20px;
+    background-color: #F0FDF4;
+    border: 1px solid #86EFAC;
+}
+
+.content-technical {
+    padding: 20px;
+    background-color: #F8FAFC;
+    border: 1px solid #E2E8F0;
+    font-family: 'Inter', sans-serif;
+}
+
+.content-security {
+    padding: 20px;
+    background-color: #FEF2F2;
+    border: 1px solid #FECACA;
+}
+
+.content-jury {
+    padding: 20px;
+    background-color: #EFF6FF;
+    border: 1px solid #BFDBFE;
+}
+
+.content-qa {
+    padding: 20px;
+    background-color: #F5F3FF;
+    border: 1px solid #DDD6FE;
+}
+
+.content-important {
+    padding: 20px;
+    background-color: #FFF7ED;
+    border: 1px solid #FDBA74;
+    font-weight: 500;
+}
+
+.content-conclusion {
+    padding: 24px;
+    background-color: #ECFDF5;
+    border: 2px solid #10B981;
+    text-align: center;
+}
+
+.block-title {
+    font-family: 'IBM Plex Sans', sans-serif;
+    font-size: 1.25rem;
+    font-weight: 600;
+    color: #0A0A0A;
+    margin-bottom: 12px;
+}
+
+.block-text {
+    color: #374151;
+    font-size: 1rem;
+    line-height: 1.75;
+}
+
+.qa-question {
+    font-family: 'IBM Plex Sans', sans-serif;
+    font-weight: 600;
+    color: #5B21B6;
+    margin-bottom: 8px;
+}
+
+.qa-answer {
+    color: #374151;
+    padding-left: 16px;
+    border-left: 2px solid #8B5CF6;
+}
+
+/* Audio player */
+.audio-player {
+    position: fixed;
+    bottom: 0;
+    left: 0;
+    right: 0;
+    background-color: #FFFFFF;
+    border-top: 1px solid #E5E7EB;
+    padding: 16px 24px;
+    z-index: 50;
+    display: flex;
+    align-items: center;
+    gap: 24px;
+}
+
+.player-controls {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+}
+
+.player-info {
+    flex: 1;
+    min-width: 0;
+}
+
+.player-title {
+    font-family: 'IBM Plex Sans', sans-serif;
+    font-weight: 500;
+    color: #0A0A0A;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+}
+
+.player-progress {
+    font-family: 'IBM Plex Mono', monospace;
+    font-size: 0.75rem;
+    color: #6B7280;
+}
+
+.player-settings {
+    display: flex;
+    align-items: center;
+    gap: 16px;
+}
+
+/* Progress bar */
+.progress-bar {
+    height: 4px;
+    background-color: #E5E7EB;
+    border-radius: 2px;
+    overflow: hidden;
+    margin-top: 8px;
+}
+
+.progress-fill {
+    height: 100%;
+    background-color: #2563EB;
+    transition: width 200ms ease-in-out;
+}
+
+/* Mobile responsive */
+@media (max-width: 768px) {
+    .sidebar {
+        width: 100%;
+        height: auto;
+        position: relative;
+        border-right: none;
+        border-bottom: 1px solid #E5E7EB;
+    }
+    
+    .main-content {
+        margin-left: 0;
+    }
+    
+    .content-area {
+        padding: 24px 16px;
+    }
+    
+    .section-title {
+        font-size: 1.75rem;
+    }
+    
+    .audio-player {
+        flex-wrap: wrap;
+        gap: 12px;
+    }
+    
+    .player-settings {
+        width: 100%;
+        justify-content: space-between;
+    }
+}
+
+/* Mobile sidebar toggle */
+.mobile-menu-btn {
+    display: none;
+    position: fixed;
+    top: 16px;
+    left: 16px;
+    z-index: 60;
+    background: white;
+    border: 1px solid #E5E7EB;
+    border-radius: 8px;
+    padding: 8px;
+}
+
+@media (max-width: 768px) {
+    .mobile-menu-btn {
+        display: flex;
+    }
+    
+    .sidebar {
+        transform: translateX(-100%);
+        transition: transform 300ms ease-in-out;
+    }
+    
+    .sidebar.open {
+        transform: translateX(0);
+    }
+}
