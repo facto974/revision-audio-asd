@@ -1,16 +1,16 @@
 from fastapi import FastAPI, APIRouter
+from fastapi.middleware.cors import CORSMiddleware
 from dotenv import load_dotenv
-from starlette.middleware.cors import CORSMiddleware
 from motor.motor_asyncio import AsyncIOMotorClient
 import os
 import logging
 from pathlib import Path
 from pydantic import BaseModel, Field, ConfigDict
-from typing import List, Optional
-import uuid
+from typing import List
 from datetime import datetime, timezone
+import uuid
 
-
+# ====================== CONFIGURATION ======================
 ROOT_DIR = Path(__file__).parent
 load_dotenv(ROOT_DIR / '.env')
 
@@ -19,14 +19,13 @@ mongo_url = os.environ['MONGO_URL']
 client = AsyncIOMotorClient(mongo_url)
 db = client[os.environ['DB_NAME']]
 
-# Create the main app without a prefix
-app = FastAPI()
+# ====================== FASTAPI APP ======================
+app = FastAPI(title="Revision Audio ASD")
 
-# Create a router with the /api prefix
+# ====================== APIRouter avec prefix /api ======================
 api_router = APIRouter(prefix="/api")
 
-
-# Define Models
+# ====================== MODELS ======================
 class StatusCheck(BaseModel):
     model_config = ConfigDict(extra="ignore")
     
@@ -34,14 +33,17 @@ class StatusCheck(BaseModel):
     client_name: str
     timestamp: datetime = Field(default_factory=lambda: datetime.now(timezone.utc))
 
+
 class StatusCheckCreate(BaseModel):
     client_name: str
+
 
 class CourseSection(BaseModel):
     id: str
     title: str
     icon: str
     content: List[dict]
+
 
 class UserProgress(BaseModel):
     model_config = ConfigDict(extra="ignore")
@@ -51,7 +53,8 @@ class UserProgress(BaseModel):
     last_position: int = 0
     updated_at: datetime = Field(default_factory=lambda: datetime.now(timezone.utc))
 
-# Course content - transformed into explanatory course format
+
+# ====================== COURSE CONTENT (complet) ======================
 COURSE_CONTENT = [
     {
         "id": "intro",
@@ -364,10 +367,10 @@ COURSE_CONTENT = [
     }
 ]
 
-# Routes
+# ====================== ROUTES ======================
 @api_router.get("/")
-async def root():
-    return {"message": "API ASD Audio Learning"}
+async def api_root():
+    return {"message": "API ASD Audio Learning - OK"}
 
 @api_router.get("/course", response_model=List[CourseSection])
 async def get_course():
@@ -409,7 +412,7 @@ async def create_status_check(input: StatusCheckCreate):
     doc = status_obj.model_dump()
     doc['timestamp'] = doc['timestamp'].isoformat()
     
-    _ = await db.status_checks.insert_one(doc)
+    await db.status_checks.insert_one(doc)
     return status_obj
 
 @api_router.get("/status", response_model=List[StatusCheck])
@@ -417,29 +420,42 @@ async def get_status_checks():
     status_checks = await db.status_checks.find({}, {"_id": 0}).to_list(1000)
     
     for check in status_checks:
-        if isinstance(check['timestamp'], str):
+        if isinstance(check.get('timestamp'), str):
             check['timestamp'] = datetime.fromisoformat(check['timestamp'])
     
     return status_checks
 
-# Include the router in the main app
+
+# ====================== INCLURE LE ROUTER ======================
 app.include_router(api_router)
 
+# ====================== CORS MIDDLEWARE ======================
 app.add_middleware(
     CORSMiddleware,
+    allow_origins=["*"],                    # Change en production par ["https://ton-frontend.vercel.app"]
     allow_credentials=True,
-    allow_origins=os.environ.get('CORS_ORIGINS', '*').split(','),
     allow_methods=["*"],
     allow_headers=["*"],
 )
 
-# Configure logging
+# ====================== ROUTE RACINE ======================
+@app.get("/")
+async def root():
+    return {
+        "message": "Revision Audio ASD API is running",
+        "status": "ok",
+        "docs_url": "/docs"
+    }
+
+
+# ====================== LOGGING ======================
 logging.basicConfig(
     level=logging.INFO,
     format='%(asctime)s - %(name)s - %(levelname)s - %(message)s'
 )
 logger = logging.getLogger(__name__)
 
+# Note : @app.on_event("shutdown") est déprécié → on peut l'améliorer plus tard avec lifespan
 @app.on_event("shutdown")
 async def shutdown_db_client():
     client.close()
