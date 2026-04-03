@@ -52,7 +52,7 @@ function App() {
   useEffect(() => {
     const fetchCourse = async () => {
       try {
-        const response = await axios.get(`${API}/course`);
+        const response = await axios.get(`${API_BASE}/api/course`);
         setCourse(response.data);
         if (response.data.length > 0) {
           setCurrentSection(response.data[0]);
