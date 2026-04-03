@@ -22,8 +22,8 @@ import {
   ChevronLeft
 } from "lucide-react";
 
-const BACKEND_URL = process.env.REACT_APP_BACKEND_URL;
-const API = `${BACKEND_URL}/api`;
+const BACKEND_URL = process.env.REACT_APP_BACKEND_URL || "http://localhost:8000";
+const API_BASE = BACKEND_URL.replace(/\/+$/, "");
 
 const iconMap = {
   Brain: Brain,
