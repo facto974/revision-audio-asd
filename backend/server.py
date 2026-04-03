@@ -1,6 +1,7 @@
 from fastapi import FastAPI, APIRouter
 from fastapi.middleware.cors import CORSMiddleware
-from fastapi.responses import JSONResponse
+from fastapi.responses import JSONResponse, FileResponse
+from fastapi.staticfiles import StaticFiles
 from dotenv import load_dotenv
 from motor.motor_asyncio import AsyncIOMotorClient
 import os
@@ -13,6 +14,7 @@ import uuid
 
 # ====================== CONFIGURATION ======================
 ROOT_DIR = Path(__file__).parent
+STATIC_DIR = ROOT_DIR / "static"
 load_dotenv(ROOT_DIR / '.env')
 
 mongo_url = os.environ.get('MONGO_URL', 'mongodb://localhost:27017')
@@ -324,6 +326,30 @@ async def root():
     })
 
 logging.basicConfig(level=logging.INFO)
+
+# ====================== SERVE FRONTEND ======================
+# Mount static files (CSS, JS, images)
+if STATIC_DIR.exists():
+    app.mount("/static", StaticFiles(directory=str(STATIC_DIR / "static")), name="static")
+    
+    # Serve index.html for all non-API routes (SPA routing)
+    @app.get("/{full_path:path}")
+    async def serve_frontend(full_path: str):
+        # If it's an API route, skip
+        if full_path.startswith("api"):
+            return JSONResponse({"error": "Not found"}, status_code=404)
+        
+        # Try to serve the file directly
+        file_path = STATIC_DIR / full_path
+        if file_path.exists() and file_path.is_file():
+            return FileResponse(file_path)
+        
+        # Otherwise serve index.html (for SPA routing)
+        index_path = STATIC_DIR / "index.html"
+        if index_path.exists():
+            return FileResponse(index_path)
+        
+        return JSONResponse({"error": "Frontend not built"}, status_code=404)
 
 @app.on_event("shutdown")
 async def shutdown_db_client():
