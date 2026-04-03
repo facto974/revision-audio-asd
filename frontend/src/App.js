@@ -3,7 +3,6 @@ import "@/App.css";
 import axios from "axios";
 import { Button } from "./components/ui/button";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "./components/ui/select";
-import { Progress } from "./components/ui/progress";
 import { ScrollArea } from "./components/ui/scroll-area";
 import { 
   Play, 
@@ -19,7 +18,16 @@ import {
   Activity,
   HelpCircle,
   ChevronRight,
-  ChevronLeft
+  ChevronLeft,
+  Terminal,
+  Shield,
+  Cloud,
+  GitBranch,
+  Database,
+  Layers,
+  BarChart,
+  Globe,
+  Wrench
 } from "lucide-react";
 
 const BACKEND_URL = process.env.REACT_APP_BACKEND_URL || "";
@@ -30,7 +38,16 @@ const iconMap = {
   Server: Server,
   Container: Container,
   Activity: Activity,
-  HelpCircle: HelpCircle
+  HelpCircle: HelpCircle,
+  Terminal: Terminal,
+  Shield: Shield,
+  Cloud: Cloud,
+  GitBranch: GitBranch,
+  Database: Database,
+  Layers: Layers,
+  BarChart: BarChart,
+  Globe: Globe,
+  Wrench: Wrench
 };
 
 function App() {
@@ -64,7 +81,7 @@ function App() {
     fetchCourse();
   }, []);
 
-  // Load French voices with retry mechanism
+  // Load French voices (excluding Canadian French)
   useEffect(() => {
     let retryCount = 0;
     const maxRetries = 10;
@@ -79,15 +96,18 @@ function App() {
       }
       
       if (availableVoices.length > 0) {
+        // Filter French voices but exclude Canadian French (fr-CA)
         const frenchVoices = availableVoices.filter(
-          voice => voice.lang.startsWith('fr')
+          voice => voice.lang.startsWith('fr') && !voice.lang.includes('CA')
         );
         
         const voicesToUse = frenchVoices.length > 0 ? frenchVoices : availableVoices.slice(0, 5);
         setVoices(voicesToUse);
         
         if (!selectedVoice && voicesToUse.length > 0) {
-          setSelectedVoice(voicesToUse[0]);
+          // Prefer fr-FR voice if available
+          const frFRVoice = voicesToUse.find(v => v.lang === 'fr-FR');
+          setSelectedVoice(frFRVoice || voicesToUse[0]);
         }
       }
     };
@@ -141,13 +161,11 @@ function App() {
   const speakBlock = useCallback((index) => {
     if (!currentSection || !currentSection.content[index]) return;
     
-    // Cancel any ongoing speech
     synthRef.current.cancel();
     
     const block = currentSection.content[index];
     const text = getBlockText(block);
     
-    // Skip empty text
     if (!text || text.trim() === '') {
       const nextIndex = index + 1;
       if (nextIndex < currentSection.content.length) {
@@ -159,7 +177,6 @@ function App() {
     
     const utterance = new SpeechSynthesisUtterance(text);
     
-    // Set voice if available, otherwise use default
     if (selectedVoice) {
       utterance.voice = selectedVoice;
     }
@@ -172,7 +189,6 @@ function App() {
       const nextIndex = index + 1;
       if (nextIndex < currentSection.content.length) {
         setCurrentBlockIndex(nextIndex);
-        // Small delay between blocks for natural pacing
         setTimeout(() => speakBlock(nextIndex), 300);
       } else {
         setIsPlaying(false);
@@ -182,7 +198,6 @@ function App() {
     
     utterance.onerror = (e) => {
       console.error("Speech error:", e);
-      // Try to continue to next block on error
       const nextIndex = index + 1;
       if (nextIndex < currentSection.content.length) {
         setCurrentBlockIndex(nextIndex);
@@ -194,7 +209,6 @@ function App() {
     
     utteranceRef.current = utterance;
     
-    // Ensure speech synthesis is ready
     try {
       synthRef.current.speak(utterance);
     } catch (err) {
@@ -202,7 +216,6 @@ function App() {
       setIsPlaying(false);
     }
     
-    // Update progress
     const progressPercent = ((index + 1) / currentSection.content.length) * 100;
     setProgress(progressPercent);
   }, [currentSection, selectedVoice, speed, getBlockText]);
@@ -283,16 +296,27 @@ function App() {
     }
   };
 
+  // Get short voice name for display
+  const getShortVoiceName = (voice) => {
+    if (!voice) return "Voix système";
+    const name = voice.name;
+    // Extract meaningful part of voice name
+    if (name.includes("Google")) return name.replace("Google ", "");
+    if (name.includes("Microsoft")) return name.split(" ").slice(1, 3).join(" ");
+    return name.split(' ').slice(0, 2).join(' ');
+  };
+
   // Render content block
   const renderBlock = (block, index) => {
     const isActive = index === currentBlockIndex && isPlaying;
+    const isPast = index < currentBlockIndex;
     const blockClass = `content-block content-${block.type}`;
     
     return (
       <div
         key={index}
         data-testid={`content-block-${index}`}
-        className={`${blockClass} ${isActive ? 'speech-highlight' : ''}`}
+        className={`${blockClass} ${isActive ? 'speech-highlight' : ''} ${isPast ? 'block-past' : ''}`}
         onClick={() => {
           setCurrentBlockIndex(index);
           if (isPlaying) {
@@ -310,6 +334,7 @@ function App() {
   };
 
   const currentSectionIndex = course.findIndex(s => s.id === currentSection?.id);
+  const completionPercent = course.length > 0 ? Math.round((completedSections.size / course.length) * 100) : 0;
 
   return (
     <div className="app-container" data-testid="app-container">
@@ -332,11 +357,20 @@ function App() {
           <p className="font-mono text-xs text-[#4B5563] mt-1 uppercase tracking-wider">
             Titre Pro Juin 2026
           </p>
+          <div className="progress-summary">
+            <div className="progress-bar-small">
+              <div 
+                className="progress-fill-small" 
+                style={{ width: `${completionPercent}%` }}
+              />
+            </div>
+            <span className="progress-text">{completionPercent}% complété</span>
+          </div>
         </div>
         
         <ScrollArea className="sidebar-nav">
           <nav>
-            {course.map((section) => {
+            {course.map((section, idx) => {
               const IconComponent = iconMap[section.icon] || Brain;
               const isActive = currentSection?.id === section.id;
               const isCompleted = completedSections.has(section.id);
@@ -348,8 +382,9 @@ function App() {
                   className={`nav-item ${isActive ? 'active' : ''} ${isCompleted ? 'completed' : ''}`}
                   onClick={() => changeSection(section)}
                 >
-                  <IconComponent size={20} />
-                  <span className="flex-1 font-body text-sm">{section.title}</span>
+                  <span className="nav-number">{idx + 1}</span>
+                  <IconComponent size={18} />
+                  <span className="flex-1 font-body text-sm nav-title">{section.title}</span>
                   {isCompleted && <CheckCircle2 size={16} className="text-green-600" />}
                 </div>
               );
@@ -363,34 +398,37 @@ function App() {
         <div className="content-area">
           {currentSection && (
             <>
-              <h2 className="section-title" data-testid="section-title">
-                {currentSection.title}
-              </h2>
+              <div className="section-header">
+                <span className="section-number">Section {currentSectionIndex + 1} / {course.length}</span>
+                <h2 className="section-title" data-testid="section-title">
+                  {currentSection.title}
+                </h2>
+              </div>
               
               <div data-testid="content-blocks">
                 {currentSection.content.map((block, index) => renderBlock(block, index))}
               </div>
               
               {/* Section navigation */}
-              <div className="flex justify-between mt-8 pt-8 border-t border-[#E5E7EB]">
+              <div className="section-nav">
                 <Button
                   variant="outline"
                   onClick={() => navigateSection(-1)}
                   disabled={currentSectionIndex <= 0}
                   data-testid="prev-section-btn"
-                  className="gap-2"
+                  className="nav-btn"
                 >
                   <ChevronLeft size={16} />
-                  Section précédente
+                  Précédent
                 </Button>
                 <Button
                   variant="outline"
                   onClick={() => navigateSection(1)}
                   disabled={currentSectionIndex >= course.length - 1}
                   data-testid="next-section-btn"
-                  className="gap-2"
+                  className="nav-btn"
                 >
-                  Section suivante
+                  Suivant
                   <ChevronRight size={16} />
                 </Button>
               </div>
@@ -408,9 +446,9 @@ function App() {
             onClick={togglePlay}
             data-testid="play-pause-btn"
             aria-label={isPlaying ? "Pause" : "Play"}
-            className="h-10 w-10"
+            className="h-12 w-12 play-btn"
           >
-            {isPlaying ? <Pause size={20} /> : <Play size={20} />}
+            {isPlaying ? <Pause size={24} /> : <Play size={24} />}
           </Button>
           <Button
             size="icon"
@@ -441,17 +479,17 @@ function App() {
         </div>
 
         <div className="player-settings">
-          <div className="flex items-center gap-2">
-            <Volume2 size={16} className="text-[#4B5563]" />
+          <div className="setting-group">
+            <Volume2 size={16} className="setting-icon" />
             <Select value={selectedVoice?.name || ""} onValueChange={changeVoice}>
-              <SelectTrigger className="w-[180px] h-9 relative z-[60]" data-testid="voice-select">
+              <SelectTrigger className="voice-select" data-testid="voice-select">
                 <SelectValue placeholder={voices.length > 0 ? "Choisir voix" : "Voix par défaut"} />
               </SelectTrigger>
               <SelectContent className="z-[70]">
                 {voices.length > 0 ? (
                   voices.map((voice) => (
                     <SelectItem key={voice.name} value={voice.name}>
-                      {voice.name.split(' ').slice(0, 2).join(' ')}
+                      {getShortVoiceName(voice)}
                     </SelectItem>
                   ))
                 ) : (
@@ -462,7 +500,7 @@ function App() {
           </div>
 
           <Select value={speed.toString()} onValueChange={changeSpeed}>
-            <SelectTrigger className="w-[100px] h-9 relative z-[60]" data-testid="speed-select">
+            <SelectTrigger className="speed-select" data-testid="speed-select">
               <SelectValue />
             </SelectTrigger>
             <SelectContent className="z-[70]">
