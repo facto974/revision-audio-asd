@@ -106,7 +106,7 @@ function App() {
   useEffect(() => {
     const loadProgress = async () => {
       try {
-        const response = await axios.get(`${API}/progress`);
+        const response = await axios.get(`${API_BASE}/api/progress`);
         const completed = new Set(
           response.data
             .filter(p => p.completed)
@@ -212,7 +212,7 @@ function App() {
     if (!currentSection) return;
     
     try {
-      await axios.post(`${API}/progress`, {
+      await axios.post(`${API_BASE}/api/progress`, {
         section_id: currentSection.id,
         completed: true,
         last_position: currentSection.content.length - 1
