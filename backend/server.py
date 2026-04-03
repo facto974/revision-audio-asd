@@ -320,17 +320,16 @@ app.add_middleware(
 logging.basicConfig(level=logging.INFO)
 
 # ====================== SERVE FRONTEND ======================
-if STATIC_DIR.exists():
-    # Mount static assets (CSS, JS, images)
-    app.mount("/static", StaticFiles(directory=str(STATIC_DIR / "static")), name="static")
+STATIC_FILES_DIR = STATIC_DIR / "static"  # CSS, JS files
+if STATIC_DIR.exists() and (STATIC_DIR / "index.html").exists():
+    # Mount static assets (CSS, JS, images) 
+    if STATIC_FILES_DIR.exists():
+        app.mount("/static", StaticFiles(directory=str(STATIC_FILES_DIR)), name="static")
     
     # Serve index.html for root
     @app.get("/")
     async def serve_root():
-        index_path = STATIC_DIR / "index.html"
-        if index_path.exists():
-            return FileResponse(index_path)
-        return JSONResponse({"error": "Frontend not built"}, status_code=404)
+        return FileResponse(STATIC_DIR / "index.html")
     
     # Serve index.html for all non-API routes (SPA routing)
     @app.get("/{full_path:path}")
@@ -342,20 +341,16 @@ if STATIC_DIR.exists():
         if file_path.exists() and file_path.is_file():
             return FileResponse(file_path)
         
-        index_path = STATIC_DIR / "index.html"
-        if index_path.exists():
-            return FileResponse(index_path)
-        
-        return JSONResponse({"error": "Frontend not built"}, status_code=404)
+        return FileResponse(STATIC_DIR / "index.html")
 else:
     # No frontend built - show API status
     @app.get("/")
     async def root():
         return JSONResponse(content={
-            "message": "Revision Audio ASD API is running ✅",
-            "status": "ok",
+            "message": "Revision Audio ASD API is running",
+            "status": "ok", 
             "sections_count": len(COURSE_CONTENT),
-            "note": "Frontend not built. Run build.sh first."
+            "note": "Frontend not found. Ensure backend/static/ contains the build."
         })
 
 @app.on_event("shutdown")
