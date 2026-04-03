@@ -317,39 +317,46 @@ app.add_middleware(
     allow_headers=["*"],
 )
 
-@app.get("/")
-async def root():
-    return JSONResponse(content={
-        "message": "Revision Audio ASD API is running ✅",
-        "status": "ok",
-        "sections_count": len(COURSE_CONTENT)
-    })
-
 logging.basicConfig(level=logging.INFO)
 
 # ====================== SERVE FRONTEND ======================
-# Mount static files (CSS, JS, images)
 if STATIC_DIR.exists():
+    # Mount static assets (CSS, JS, images)
     app.mount("/static", StaticFiles(directory=str(STATIC_DIR / "static")), name="static")
+    
+    # Serve index.html for root
+    @app.get("/")
+    async def serve_root():
+        index_path = STATIC_DIR / "index.html"
+        if index_path.exists():
+            return FileResponse(index_path)
+        return JSONResponse({"error": "Frontend not built"}, status_code=404)
     
     # Serve index.html for all non-API routes (SPA routing)
     @app.get("/{full_path:path}")
     async def serve_frontend(full_path: str):
-        # If it's an API route, skip
         if full_path.startswith("api"):
             return JSONResponse({"error": "Not found"}, status_code=404)
         
-        # Try to serve the file directly
         file_path = STATIC_DIR / full_path
         if file_path.exists() and file_path.is_file():
             return FileResponse(file_path)
         
-        # Otherwise serve index.html (for SPA routing)
         index_path = STATIC_DIR / "index.html"
         if index_path.exists():
             return FileResponse(index_path)
         
         return JSONResponse({"error": "Frontend not built"}, status_code=404)
+else:
+    # No frontend built - show API status
+    @app.get("/")
+    async def root():
+        return JSONResponse(content={
+            "message": "Revision Audio ASD API is running ✅",
+            "status": "ok",
+            "sections_count": len(COURSE_CONTENT),
+            "note": "Frontend not built. Run build.sh first."
+        })
 
 @app.on_event("shutdown")
 async def shutdown_db_client():
