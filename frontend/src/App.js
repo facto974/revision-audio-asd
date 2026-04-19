@@ -64,25 +64,29 @@ function App() {
   const [speed, setSpeed] = useState(1);
   const [sidebarOpen, setSidebarOpen] = useState(false);
   const [progress, setProgress] = useState(0);
-  const [continuousPlay, setContinuousPlay] = useState(true);
+  const [isMobile, setIsMobile] = useState(false);
   
   const synthRef = useRef(window.speechSynthesis);
+  const continuousPlayRef = useRef(false);
+  const currentIndexRef = useRef(0);
 
-  // Load French voices (excluding Canadian French)
+  // Detect mobile
   useEffect(() => {
-    let retryCount = 0;
+    const checkMobile = /iPhone|iPad|iPod|Android/i.test(navigator.userAgent);
+    setIsMobile(checkMobile);
+  }, []);
+
+  // Load voices with better mobile support
+  useEffect(() => {
     const loadVoices = () => {
       const availableVoices = synthRef.current.getVoices();
-      if (availableVoices.length === 0 && retryCount < 10) {
-        retryCount++;
-        setTimeout(loadVoices, 200);
-        return;
-      }
       if (availableVoices.length > 0) {
+        // On mobile, prefer any French voice available
         const frenchVoices = availableVoices.filter(
           v => v.lang.startsWith('fr') && !v.lang.includes('CA')
         );
-        const voicesToUse = frenchVoices.length > 0 ? frenchVoices : availableVoices.slice(0, 5);
+        // Fallback to any voice if no French
+        const voicesToUse = frenchVoices.length > 0 ? frenchVoices : availableVoices;
         setVoices(voicesToUse);
         if (!selectedVoice && voicesToUse.length > 0) {
           const frFR = voicesToUse.find(v => v.lang === 'fr-FR');
@@ -90,11 +94,18 @@ function App() {
         }
       }
     };
+    
+    // Initial load
     loadVoices();
+    
+    // Listen for voices changed (needed for some browsers)
     if (synthRef.current.onvoiceschanged !== undefined) {
       synthRef.current.onvoiceschanged = loadVoices;
     }
-    setTimeout(loadVoices, 500);
+    
+    // Retry for mobile browsers that load voices async
+    const intervals = [100, 250, 500, 1000, 2000];
+    intervals.forEach(ms => setTimeout(loadVoices, ms));
   }, [selectedVoice]);
 
   // Transform technical content for audio
@@ -131,29 +142,6 @@ function App() {
     return transformTextForAudio(text);
   }, [transformTextForAudio]);
 
-  // Speak a single block
-  const speakSingleBlock = useCallback((index) => {
-    if (!currentSection?.content[index]) return;
-    synthRef.current.cancel();
-    setCurrentBlockIndex(index);
-    const text = getBlockText(currentSection.content[index]);
-    if (!text) return;
-    
-    const utterance = new SpeechSynthesisUtterance(text);
-    if (selectedVoice) utterance.voice = selectedVoice;
-    utterance.rate = speed;
-    utterance.lang = 'fr-FR';
-    
-    utterance.onstart = () => setIsPlaying(true);
-    utterance.onend = () => {
-      setIsPlaying(false);
-      setProgress(((index + 1) / currentSection.content.length) * 100);
-    };
-    utterance.onerror = () => setIsPlaying(false);
-    
-    synthRef.current.speak(utterance);
-  }, [currentSection, selectedVoice, speed, getBlockText]);
-
   // Mark section complete
   const markSectionComplete = useCallback(() => {
     if (!currentSection) return;
@@ -164,106 +152,193 @@ function App() {
     saveProgressToStorage(progressData);
   }, [currentSection, completedSections]);
 
-  // Speak with continuous play
-  const speakBlock = useCallback((index) => {
-    if (!currentSection?.content[index]) return;
+  // Core speak function - works on mobile
+  const speak = useCallback((text, onEnd) => {
+    // Cancel any ongoing speech
     synthRef.current.cancel();
-    const text = getBlockText(currentSection.content[index]);
     
-    if (!text && continuousPlay) {
-      const next = index + 1;
-      if (next < currentSection.content.length) {
-        setCurrentBlockIndex(next);
-        setTimeout(() => speakBlock(next), 100);
-      }
+    if (!text || text.trim() === '') {
+      if (onEnd) onEnd();
       return;
     }
-    
+
     const utterance = new SpeechSynthesisUtterance(text);
-    if (selectedVoice) utterance.voice = selectedVoice;
+    
+    // Set voice - important for mobile
+    if (selectedVoice) {
+      utterance.voice = selectedVoice;
+    }
     utterance.rate = speed;
     utterance.lang = 'fr-FR';
-    
-    utterance.onend = () => {
-      const next = index + 1;
-      if (next < currentSection.content.length && continuousPlay) {
-        setCurrentBlockIndex(next);
-        setTimeout(() => speakBlock(next), 300);
-      } else {
-        setIsPlaying(false);
-        if (next >= currentSection.content.length) markSectionComplete();
-      }
-    };
-    utterance.onerror = () => {
-      const next = index + 1;
-      if (next < currentSection.content.length && continuousPlay) {
-        setCurrentBlockIndex(next);
-        setTimeout(() => speakBlock(next), 100);
-      } else setIsPlaying(false);
-    };
-    
-    synthRef.current.speak(utterance);
-    setProgress(((index + 1) / currentSection.content.length) * 100);
-  }, [currentSection, selectedVoice, speed, getBlockText, continuousPlay, markSectionComplete]);
+    utterance.volume = 1;
+    utterance.pitch = 1;
 
-  const togglePlay = () => {
+    utterance.onstart = () => {
+      setIsPlaying(true);
+    };
+
+    utterance.onend = () => {
+      setIsPlaying(false);
+      if (onEnd) onEnd();
+    };
+
+    utterance.onerror = (e) => {
+      console.log('Speech error:', e);
+      setIsPlaying(false);
+      if (onEnd) onEnd();
+    };
+
+    // iOS fix: ensure speech synthesis is resumed
+    if (synthRef.current.paused) {
+      synthRef.current.resume();
+    }
+
+    synthRef.current.speak(utterance);
+
+    // iOS fix: Chrome on iOS sometimes needs a kick
+    if (isMobile) {
+      setTimeout(() => {
+        if (synthRef.current.paused) {
+          synthRef.current.resume();
+        }
+      }, 100);
+    }
+  }, [selectedVoice, speed, isMobile]);
+
+  // Play single block (on click)
+  const handleBlockClick = useCallback((index) => {
+    continuousPlayRef.current = false;
+    currentIndexRef.current = index;
+    setCurrentBlockIndex(index);
+    
+    const text = getBlockText(currentSection.content[index]);
+    setProgress(((index + 1) / currentSection.content.length) * 100);
+    
+    speak(text, () => {
+      // Single block done
+    });
+  }, [currentSection, getBlockText, speak]);
+
+  // Play next block in sequence
+  const playNextBlock = useCallback(() => {
+    if (!continuousPlayRef.current) return;
+    
+    const nextIndex = currentIndexRef.current + 1;
+    
+    if (nextIndex >= currentSection.content.length) {
+      // Section complete
+      setIsPlaying(false);
+      continuousPlayRef.current = false;
+      markSectionComplete();
+      return;
+    }
+
+    currentIndexRef.current = nextIndex;
+    setCurrentBlockIndex(nextIndex);
+    
+    const text = getBlockText(currentSection.content[nextIndex]);
+    setProgress(((nextIndex + 1) / currentSection.content.length) * 100);
+
+    // Skip empty blocks
+    if (!text || text.trim() === '') {
+      playNextBlock();
+      return;
+    }
+
+    speak(text, () => {
+      // When this block ends, play next
+      if (continuousPlayRef.current) {
+        // Small delay between blocks for natural pacing
+        setTimeout(playNextBlock, 300);
+      }
+    });
+  }, [currentSection, getBlockText, speak, markSectionComplete]);
+
+  // Start continuous play
+  const startContinuousPlay = useCallback(() => {
+    continuousPlayRef.current = true;
+    currentIndexRef.current = currentBlockIndex;
+    
+    const text = getBlockText(currentSection.content[currentBlockIndex]);
+    setProgress(((currentBlockIndex + 1) / currentSection.content.length) * 100);
+
+    speak(text, () => {
+      if (continuousPlayRef.current) {
+        setTimeout(playNextBlock, 300);
+      }
+    });
+  }, [currentBlockIndex, currentSection, getBlockText, speak, playNextBlock]);
+
+  // Toggle play/pause
+  const togglePlay = useCallback(() => {
     if (isPlaying) {
       synthRef.current.cancel();
+      continuousPlayRef.current = false;
       setIsPlaying(false);
     } else {
-      setContinuousPlay(true);
-      speakBlock(currentBlockIndex);
-      setIsPlaying(true);
+      startContinuousPlay();
     }
-  };
+  }, [isPlaying, startContinuousPlay]);
 
-  const stopPlayback = () => {
+  // Stop playback
+  const stopPlayback = useCallback(() => {
     synthRef.current.cancel();
+    continuousPlayRef.current = false;
     setIsPlaying(false);
     setCurrentBlockIndex(0);
+    currentIndexRef.current = 0;
     setProgress(0);
-  };
+  }, []);
 
-  const handleBlockClick = (index) => {
-    setContinuousPlay(false);
-    speakSingleBlock(index);
-  };
-
-  const changeSection = (section) => {
+  // Change section
+  const changeSection = useCallback((section) => {
     stopPlayback();
     setCurrentSection(section);
     setCurrentBlockIndex(0);
+    currentIndexRef.current = 0;
     setProgress(0);
     setSidebarOpen(false);
-  };
+  }, [stopPlayback]);
 
-  const navigateSection = (direction) => {
+  // Navigate sections
+  const navigateSection = useCallback((direction) => {
     const idx = course.findIndex(s => s.id === currentSection?.id);
     const newIdx = idx + direction;
-    if (newIdx >= 0 && newIdx < course.length) changeSection(course[newIdx]);
-  };
+    if (newIdx >= 0 && newIdx < course.length) {
+      changeSection(course[newIdx]);
+    }
+  }, [course, currentSection, changeSection]);
 
-  const changeSpeed = (newSpeed) => {
+  // Change speed
+  const changeSpeed = useCallback((newSpeed) => {
     setSpeed(parseFloat(newSpeed));
-    if (isPlaying) stopPlayback();
-  };
+    if (isPlaying) {
+      stopPlayback();
+    }
+  }, [isPlaying, stopPlayback]);
 
-  const changeVoice = (voiceName) => {
+  // Change voice
+  const changeVoice = useCallback((voiceName) => {
     const voice = voices.find(v => v.name === voiceName);
     if (voice) {
       setSelectedVoice(voice);
-      if (isPlaying) stopPlayback();
+      if (isPlaying) {
+        stopPlayback();
+      }
     }
-  };
+  }, [voices, isPlaying, stopPlayback]);
 
+  // Get short voice name
   const getShortVoiceName = (voice) => {
-    if (!voice) return "Voix système";
+    if (!voice) return "Voix";
     const name = voice.name;
     if (name.includes("Google")) return name.replace("Google ", "");
     if (name.includes("Microsoft")) return name.split(" ").slice(1, 3).join(" ");
-    return name.split(' ').slice(0, 2).join(' ');
+    if (name.length > 20) return name.substring(0, 18) + "...";
+    return name;
   };
 
+  // Render block
   const renderBlock = (block, index) => {
     const isActive = index === currentBlockIndex && isPlaying;
     const isCurrent = index === currentBlockIndex;
@@ -337,7 +412,9 @@ function App() {
               <div className="section-header">
                 <span className="section-number">Section {currentSectionIndex + 1} / {course.length}</span>
                 <h2 className="section-title">{currentSection.title}</h2>
-                <p className="section-hint">Cliquez sur un bloc pour l'écouter</p>
+                <p className="section-hint">
+                  {isMobile ? "Appuyez sur un bloc pour l'écouter" : "Cliquez sur un bloc pour l'écouter"}
+                </p>
               </div>
               
               <div data-testid="content-blocks">
@@ -359,7 +436,13 @@ function App() {
 
       <div className="audio-player" data-testid="audio-player">
         <div className="player-controls">
-          <Button size="icon" variant={isPlaying ? "default" : "outline"} onClick={togglePlay} className="h-12 w-12 play-btn" title={isPlaying ? "Pause" : "Lecture continue"}>
+          <Button 
+            size="icon" 
+            variant={isPlaying ? "default" : "outline"} 
+            onClick={togglePlay} 
+            className="h-12 w-12 play-btn" 
+            title={isPlaying ? "Pause" : "Lecture continue"}
+          >
             {isPlaying ? <Pause size={24} /> : <Play size={24} />}
           </Button>
           <Button size="icon" variant="outline" onClick={stopPlayback} className="h-10 w-10" title="Stop">
