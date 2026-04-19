@@ -7,7 +7,7 @@ echo "📦 Installing frontend dependencies..."
 cd frontend
 
 # Use Yarn since your project is configured for it (better consistency)
-yarn install --frozen-lockfile
+yarn install
 
 echo "🔨 Building frontend..."
 # Clear REACT_APP_BACKEND_URL or set it if needed for production
