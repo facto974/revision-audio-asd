@@ -12,14 +12,18 @@ import tempfile
 import pyttsx3
 from pathlib import Path
 from pydantic import BaseModel, Field, ConfigDict
-from typing import List, Optional
+from typing import List, Optional, Dict, Any
 from datetime import datetime, timezone
 import uuid
+import json as _json
 
 # ====================== CONFIGURATION ======================
 ROOT_DIR = Path(__file__).parent
 STATIC_DIR = ROOT_DIR / "static"
 load_dotenv(ROOT_DIR / '.env')
+
+# Constantes
+ITEMS_PER_PAGE = 5  # Nombre d'éléments par page
 
 mongo_url = os.environ.get('MONGO_URL', 'mongodb://localhost:27017')
 client = AsyncIOMotorClient(mongo_url)
@@ -59,9 +63,13 @@ class UserProgress(BaseModel):
     last_position: int = 0
     updated_at: datetime = Field(default_factory=lambda: datetime.now(timezone.utc))
 
+class PaginatedResponse(BaseModel):
+    data: List[Dict[str, Any]]
+    page: int
+    total_pages: int
+    total_items: int
 
-# ====================== FONCTIONS TTS OPTIMISÉES (pyttsx3, conservé pour /api/audio) ======================
-
+# ====================== FONCTIONS TTS ======================
 def _init_tts_engine() -> pyttsx3.Engine:
     engine = pyttsx3.init()
     voices = engine.getProperty('voices')
@@ -76,7 +84,6 @@ def _init_tts_engine() -> pyttsx3.Engine:
     engine.setProperty('rate', 150)
     return engine
 
-
 def _render_tts(engine: pyttsx3.Engine, text: str, rate: int = 150) -> bytes:
     engine.setProperty('rate', rate)
     with tempfile.NamedTemporaryFile(suffix=".wav", delete=False) as tmp:
@@ -87,7 +94,6 @@ def _render_tts(engine: pyttsx3.Engine, text: str, rate: int = 150) -> bytes:
         data = f.read()
     os.unlink(tmp_path)
     return data
-
 
 SPELL_OUT = {
     "apt": "A-P-T", "ssh": "S-S-H", "tls": "T-L-S", "ssl": "S-S-L",
@@ -127,14 +133,12 @@ KNOWN_PATTERNS = [
     (r'\$\{\{\s*(\S+)\s*\}\}', lambda m: f" variable {m.group(1)} "),
 ]
 
-
 def _apply_spell_out(token: str) -> str:
     lower = token.lower().rstrip(".,;:")
     if lower in SPELL_OUT:
         suffix = token[len(lower):]
         return SPELL_OUT[lower] + suffix
     return token
-
 
 def format_command_for_tts(command: str) -> str:
     processed = command.strip()
@@ -144,7 +148,6 @@ def format_command_for_tts(command: str) -> str:
     readable_tokens = [_apply_spell_out(t) for t in tokens]
     readable = ", ".join(readable_tokens)
     return f"Commande terminal. {readable}. Fin de commande."
-
 
 def format_code_for_tts(code: str) -> str:
     lines = [l.strip() for l in code.strip().splitlines() if l.strip()]
@@ -160,7 +163,6 @@ def format_code_for_tts(code: str) -> str:
         readable_lines.append(vocalised)
     body = ". Ligne suivante. ".join(readable_lines)
     return f"Extrait de code. {body}. Fin de l'extrait."
-
 
 def format_yaml_for_tts(yaml_text: str) -> str:
     lines = yaml_text.strip().splitlines()
@@ -190,7 +192,6 @@ def format_yaml_for_tts(yaml_text: str) -> str:
     readable_parts.append("Fin du fichier de configuration.")
     return " ".join(readable_parts)
 
-
 def _is_command(text: str) -> bool:
     command_starters = [
         "docker", "kubectl", "terraform", "ansible", "ansible-playbook",
@@ -200,10 +201,8 @@ def _is_command(text: str) -> bool:
     ]
     return any(text.strip().lower().startswith(s) for s in command_starters)
 
-
 def _is_yaml_block(text: str) -> bool:
     return "\n" in text and (":" in text or "- " in text)
-
 
 def generate_audio_for_item(engine: pyttsx3.Engine, item: dict) -> bytes:
     item_type = item.get("type", "")
@@ -239,7 +238,6 @@ def generate_audio_for_item(engine: pyttsx3.Engine, item: dict) -> bytes:
         title = item.get("title", "")
         prefix = f"{title}. " if title else ""
         return _render_tts(engine, prefix + text, rate=150)
-
 
 # ====================== CONTENU DE COURS ======================
 COURSE_CONTENT = [
@@ -487,17 +485,7 @@ COURSE_CONTENT = [
     },
 ]
 
-
-# ====================== HTML FRONTEND INTÉGRÉ ======================
-# Le frontend utilise l'API Web Speech du navigateur pour une lecture
-# INSTANTANÉE au clic — aucun appel serveur, zéro latence.
-# Fonctionnalités :
-#   - Clic sur un bloc → surbrillance + lecture immédiate
-#   - Vitesse adaptée au type : technique/code plus lent, prose normal
-#   - Langue FR par défaut, bascule EN disponible
-#   - Sélecteur de voix parmi celles disponibles sur le système
-#   - Bouton stop, indicateur de lecture en cours
-
+# ====================== HTML FRONTEND ======================
 FRONTEND_HTML = """<!DOCTYPE html>
 <html lang="fr">
 <head>
@@ -531,8 +519,7 @@ FRONTEND_HTML = """<!DOCTYPE html>
     display: flex;
     flex-direction: column;
   }
-
-  /* ── Header ── */
+  /* Header */
   header {
     padding: 16px 24px;
     background: var(--surface);
@@ -553,8 +540,7 @@ FRONTEND_HTML = """<!DOCTYPE html>
     white-space: nowrap;
   }
   .logo span { color: var(--text2); font-weight: 400; }
-
-  /* ── Status bar ── */
+  /* Status bar */
   .status-bar {
     display: flex;
     align-items: center;
@@ -572,8 +558,7 @@ FRONTEND_HTML = """<!DOCTYPE html>
   .status-dot.playing { background: var(--green); box-shadow: 0 0 6px var(--green); animation: pulse 1s infinite; }
   @keyframes pulse { 0%,100%{opacity:1} 50%{opacity:0.5} }
   #status-text { font-size: 13px; color: var(--text2); white-space: nowrap; }
-
-  /* ── Controls ── */
+  /* Controls */
   .controls { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; }
   select, button {
     font-family: var(--sans);
@@ -607,11 +592,9 @@ FRONTEND_HTML = """<!DOCTYPE html>
     background: var(--accent);
     color: #fff;
   }
-
-  /* ── Layout ── */
+  /* Layout */
   .main { display: flex; flex: 1; overflow: hidden; }
-
-  /* ── Sidebar ── */
+  /* Sidebar */
   aside {
     width: 220px;
     flex-shrink: 0;
@@ -656,8 +639,7 @@ FRONTEND_HTML = """<!DOCTYPE html>
     transition: opacity 0.3s;
   }
   .nav-item.done .progress-dot { opacity: 1; }
-
-  /* ── Content area ── */
+  /* Content area */
   .content-wrap {
     flex: 1;
     overflow-y: auto;
@@ -675,8 +657,7 @@ FRONTEND_HTML = """<!DOCTYPE html>
   .section-title { font-size: 20px; font-weight: 700; letter-spacing: -0.02em; }
   .section-hint { font-size: 13px; color: var(--text3); margin-top: 2px; }
   .items-list { display: flex; flex-direction: column; gap: 6px; }
-
-  /* ── Item blocks ── */
+  /* Item blocks */
   .item-block {
     padding: 12px 14px;
     border-radius: 8px;
@@ -697,13 +678,11 @@ FRONTEND_HTML = """<!DOCTYPE html>
   .item-block:hover { border-color: var(--border); background: var(--surface2); }
   .item-block:hover::before { background: var(--accent); }
   .item-block:active { transform: scale(0.995); }
-
   /* States */
   .item-block.highlighted { background: rgba(79,124,255,0.08); border-color: rgba(79,124,255,0.4); }
   .item-block.highlighted::before { background: var(--accent); }
   .item-block.playing { background: rgba(34,197,94,0.08); border-color: rgba(34,197,94,0.4); }
   .item-block.playing::before { background: var(--green); }
-
   /* Type badge */
   .type-badge {
     display: inline-flex;
@@ -731,10 +710,8 @@ FRONTEND_HTML = """<!DOCTYPE html>
   .badge-file     { background: rgba(6,182,212,0.12); color: #22d3ee; }
   .badge-qa       { background: rgba(245,158,11,0.15); color: #fbbf24; }
   .badge-conclusion{ background: rgba(34,197,94,0.12); color: #4ade80; }
-
   .item-title { font-size: 14px; font-weight: 600; color: var(--text); margin-bottom: 4px; }
   .item-text  { font-size: 14px; color: var(--text2); line-height: 1.65; }
-
   /* Code block */
   .item-code {
     font-family: var(--mono);
@@ -748,7 +725,6 @@ FRONTEND_HTML = """<!DOCTYPE html>
     line-height: 1.6;
     border: 1px solid rgba(6,182,212,0.2);
   }
-
   /* Q&A */
   .qa-question {
     font-size: 14px;
@@ -777,7 +753,6 @@ FRONTEND_HTML = """<!DOCTYPE html>
     border-left: 2px solid rgba(34,197,94,0.3);
     margin-left: 0;
   }
-
   /* Play indicator */
   .play-icon {
     position: absolute;
@@ -791,7 +766,6 @@ FRONTEND_HTML = """<!DOCTYPE html>
   }
   .item-block:hover .play-icon { opacity: 0.6; }
   .item-block.playing .play-icon { opacity: 1; color: var(--green); animation: pulse 1s infinite; }
-
   /* Speed badge */
   .speed-info {
     font-size: 10px;
@@ -804,12 +778,38 @@ FRONTEND_HTML = """<!DOCTYPE html>
     transition: opacity 0.15s;
   }
   .item-block:hover .speed-info { opacity: 1; }
-
   /* Scrollbar */
   ::-webkit-scrollbar { width: 6px; }
   ::-webkit-scrollbar-track { background: transparent; }
   ::-webkit-scrollbar-thumb { background: var(--border); border-radius: 3px; }
-
+  /* Pagination */
+  .pagination {
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    gap: 8px;
+    margin-top: 20px;
+    padding: 12px 0;
+  }
+  .pagination button {
+    padding: 6px 12px;
+    border-radius: 6px;
+    border: 1px solid var(--border);
+    background: var(--surface2);
+    color: var(--text);
+    cursor: pointer;
+    font-size: 13px;
+    transition: all 0.15s;
+  }
+  .pagination button:hover {
+    background: var(--surface);
+    border-color: var(--accent);
+  }
+  .pagination button.active {
+    background: var(--accent);
+    color: white;
+    border-color: var(--accent);
+  }
   /* Mobile */
   @media (max-width: 680px) {
     aside { display: none; }
@@ -818,7 +818,6 @@ FRONTEND_HTML = """<!DOCTYPE html>
 </style>
 </head>
 <body>
-
 <!-- Header -->
 <header>
   <div class="logo">Révision ASD <span>/ Titre Pro</span></div>
@@ -847,14 +846,18 @@ FRONTEND_HTML = """<!DOCTYPE html>
   <div class="content-wrap">
     <div id="section-header" class="section-header"></div>
     <div class="items-list" id="items-list"></div>
+    <div class="pagination" id="pagination"></div>
   </div>
 </div>
 
 <script>
 // ─────────────────────────────────────────────────────────
-// DONNÉES (injectées depuis Python)
+// CONSTANTES
 // ─────────────────────────────────────────────────────────
+const ITEMS_PER_PAGE = __ITEMS_PER_PAGE__;
 const COURSE = __COURSE_JSON__;
+let currentSectionId = null;
+let currentPage = 1;
 
 // ─────────────────────────────────────────────────────────
 // ÉTAT
@@ -868,89 +871,14 @@ let progress = {};
 
 // ─────────────────────────────────────────────────────────
 // VITESSES PAR TYPE DE CONTENU
-//   Plus lent pour le code/commandes (on doit tout comprendre)
-//   Normal pour la prose
 // ─────────────────────────────────────────────────────────
 const RATES = {
-  audio_command:      0.75,   // commandes shell : très lent
-  audio_code:         0.78,   // lignes de code : très lent
-  audio_file:         0.72,   // fichiers config multi-lignes : ultra lent
-  audio_code_explain: 0.88,   // explication de code : un peu lent
-  security:           0.88,
-  jury:               0.88,
-  qa:                 0.88,
-  audio_terminal_tip: 0.90,
-  method:             0.92,
-  technical:          0.90,
-  concept:            0.95,
-  intro:              0.98,
-  audio_analogy:      0.95,
-  conclusion:         0.92,
-  _default:           0.95,
+  audio_command: 0.75, audio_code: 0.78, audio_file: 0.72,
+  audio_code_explain: 0.88, security: 0.88, jury: 0.88, qa: 0.88,
+  audio_terminal_tip: 0.90, method: 0.92, technical: 0.90,
+  concept: 0.95, intro: 0.98, audio_analogy: 0.95, conclusion: 0.92,
+  _default: 0.95,
 };
-
-function getRate(type) {
-  return RATES[type] || RATES._default;
-}
-
-// ─────────────────────────────────────────────────────────
-// TEXTE À LIRE selon le type et la langue
-// ─────────────────────────────────────────────────────────
-function buildSpeechText(item) {
-  const t = item.type;
-  const text  = item.text  || '';
-  const title = item.title || '';
-  const lang  = currentLang;
-
-  // ── Préfixes FR / EN selon le type ──
-  const prefixes = {
-    fr: {
-      audio_command:      'Commande terminal. ',
-      audio_code:         'Code. ',
-      audio_file:         'Fichier de configuration. ',
-      audio_code_explain: '',
-      audio_terminal_tip: 'Astuce importante. ',
-      audio_analogy:      'Pour mieux comprendre. ',
-      security:           'Point sécurité. ',
-      jury:               'Question piège du jury. ',
-      qa:                 '',
-      conclusion:         'Pour conclure. ',
-      method:             'Méthode. ',
-      concept:            'Concept clé. ',
-      technical:          '',
-      intro:              '',
-    },
-    en: {
-      audio_command:      'Terminal command. ',
-      audio_code:         'Code. ',
-      audio_file:         'Configuration file. ',
-      audio_code_explain: '',
-      audio_terminal_tip: 'Important tip. ',
-      audio_analogy:      'To understand better. ',
-      security:           'Security point. ',
-      jury:               'Tricky jury question. ',
-      qa:                 '',
-      conclusion:         'To conclude. ',
-      method:             'Method. ',
-      concept:            'Key concept. ',
-      technical:          '',
-      intro:              '',
-    },
-  };
-
-  const prefix = (prefixes[lang][t] || '');
-  const titlePart = title ? title + '. ' : '';
-
-  if (t === 'qa') {
-    const q = item.question || '';
-    const a = item.answer   || '';
-    return lang === 'fr'
-      ? `Question du jury. ${q}. Réponse. ${a}.`
-      : `Jury question. ${q}. Answer. ${a}.`;
-  }
-
-  return prefix + titlePart + text;
-}
 
 // ─────────────────────────────────────────────────────────
 // WEB SPEECH API
@@ -958,7 +886,7 @@ function buildSpeechText(item) {
 function loadVoices() {
   const all = speechSynthesis.getVoices();
   if (!all.length) {
-    setTimeout(loadVoices, 100); // Réessayer si les voix ne sont pas encore chargées
+    setTimeout(loadVoices, 100);
     return;
   }
   voices = all;
@@ -967,11 +895,7 @@ function loadVoices() {
 
   const sel = document.getElementById('voice-select');
   sel.innerHTML = '';
-
-  const pool = currentLang === 'fr'
-    ? (frVoices.length ? frVoices : all)
-    : (enVoices.length ? enVoices : all);
-
+  const pool = currentLang === 'fr' ? (frVoices.length ? frVoices : all) : (enVoices.length ? enVoices : all);
   pool.forEach((v, i) => {
     const opt = document.createElement('option');
     opt.value = i;
@@ -983,9 +907,7 @@ function loadVoices() {
 function getSelectedVoice() {
   const sel = document.getElementById('voice-select');
   const idx = parseInt(sel.value) || 0;
-  const pool = currentLang === 'fr'
-    ? (frVoices.length ? frVoices : voices)
-    : (enVoices.length ? enVoices : voices);
+  const pool = currentLang === 'fr' ? (frVoices.length ? frVoices : voices) : (enVoices.length ? enVoices : voices);
   return pool[idx] || null;
 }
 
@@ -995,79 +917,47 @@ function setLang(lang) {
   document.getElementById('btn-en').classList.toggle('active', lang === 'en');
   loadVoices();
   setStatus('Langue changée — cliquez pour relire');
-  // Recharger la section actuelle pour appliquer la nouvelle langue
-  if (currentSectionId) {
-    renderSection(currentSectionId);
-  }
+  if (currentSectionId) renderSection(currentSectionId, currentPage);
 }
 
 function speak(item, blockEl) {
-  // Arrêter toute lecture en cours
   speechSynthesis.cancel();
-
-  // Réinitialiser l'état visuel du bloc précédent
-  if (currentBlock) {
-    currentBlock.classList.remove('playing', 'highlighted');
-  }
-
-  // Mettre à jour le bloc actuel
+  if (currentBlock) currentBlock.classList.remove('playing', 'highlighted');
   currentBlock = blockEl;
   currentBlock.classList.add('playing');
+  document.getElementById('status-dot').classList.add('playing');
 
-  // Mettre à jour l'indicateur de statut
-  const dot = document.getElementById('status-dot');
-  dot.classList.add('playing');
-
-  // Construire le texte à lire
   const text = buildSpeechText(item);
   const rate = getRate(item.type);
+  setStatus(`Lecture... (×${rate.toFixed(2)})`);
 
-  // Mettre à jour le statut
-  setStatus(`Lecture en cours... (vitesse ×${rate.toFixed(2)})`);
-
-  // Créer l'énoncé de synthèse vocale
   const utt = new SpeechSynthesisUtterance(text);
   utt.lang = currentLang === 'fr' ? 'fr-FR' : 'en-US';
   utt.rate = rate;
-
-  // Sélectionner une voix si disponible
   const voice = getSelectedVoice();
-  if (voice) {
-    utt.voice = voice;
-  }
+  if (voice) utt.voice = voice;
 
-  // Gérer la fin de la lecture
   utt.onend = () => {
     if (currentBlock) {
       currentBlock.classList.remove('playing');
       currentBlock.classList.add('highlighted');
     }
-    dot.classList.remove('playing');
-    currentBlock = null;
-    setStatus('Lecture terminée. Cliquez sur un autre bloc pour lire.');
+    document.getElementById('status-dot').classList.remove('playing');
+    setStatus('Lecture terminée. Cliquez pour relire.');
   };
 
-  // Gérer les erreurs
-  utt.onerror = (e) => {
-    console.error('Erreur de synthèse vocale:', e);
-    if (currentBlock) {
-      currentBlock.classList.remove('playing');
-    }
-    dot.classList.remove('playing');
-    currentBlock = null;
-    setStatus('Erreur de lecture. Veuillez réessayer.');
+  utt.onerror = () => {
+    if (currentBlock) currentBlock.classList.remove('playing');
+    document.getElementById('status-dot').classList.remove('playing');
+    setStatus('Erreur de lecture. Réessayez.');
   };
 
-  // Démarrer la lecture
   speechSynthesis.speak(utt);
 }
 
 function stopAll() {
   speechSynthesis.cancel();
-  if (currentBlock) {
-    currentBlock.classList.remove('playing', 'highlighted');
-    currentBlock = null;
-  }
+  if (currentBlock) currentBlock.classList.remove('playing', 'highlighted');
   document.getElementById('status-dot').classList.remove('playing');
   setStatus('Arrêté');
 }
@@ -1077,83 +967,102 @@ function setStatus(msg) {
 }
 
 // ─────────────────────────────────────────────────────────
+// PAGINATION
+// ─────────────────────────────────────────────────────────
+function paginateContent(content, page) {
+  const total_items = content.length;
+  const total_pages = Math.ceil(total_items / ITEMS_PER_PAGE);
+  const start_idx = (page - 1) * ITEMS_PER_PAGE;
+  const end_idx = start_idx + ITEMS_PER_PAGE;
+  return {
+    data: content.slice(start_idx, end_idx),
+    page: page,
+    total_pages: total_pages,
+    total_items: total_items
+  };
+}
+
+function renderPagination(totalPages, currentPage) {
+  const paginationDiv = document.getElementById('pagination');
+  paginationDiv.innerHTML = '';
+
+  if (currentPage > 1) {
+    const prevButton = document.createElement('button');
+    prevButton.textContent = '←';
+    prevButton.addEventListener('click', () => renderSection(currentSectionId, currentPage - 1));
+    paginationDiv.appendChild(prevButton);
+  }
+
+  for (let i = 1; i <= totalPages; i++) {
+    const button = document.createElement('button');
+    button.textContent = i;
+    if (i === currentPage) button.classList.add('active');
+    button.addEventListener('click', () => renderSection(currentSectionId, i));
+    paginationDiv.appendChild(button);
+  }
+
+  if (currentPage < totalPages) {
+    const nextButton = document.createElement('button');
+    nextButton.textContent = '→';
+    nextButton.addEventListener('click', () => renderSection(currentSectionId, currentPage + 1));
+    paginationDiv.appendChild(nextButton);
+  }
+}
+
+// ─────────────────────────────────────────────────────────
 // RENDU DES BLOCS
 // ─────────────────────────────────────────────────────────
 const TYPE_LABELS = {
-  intro:              ['intro',     'badge-intro'],
-  concept:            ['concept',   'badge-concept'],
-  method:             ['méthode',   'badge-method'],
-  technical:          ['technique', 'badge-technical'],
-  security:           ['sécurité',  'badge-security'],
-  jury:               ['⚠ jury',   'badge-jury'],
-  audio_command:      ['commande',  'badge-command'],
-  audio_code:         ['code',      'badge-code'],
-  audio_code_explain: ['explication','badge-explain'],
-  audio_terminal_tip: ['astuce',    'badge-tip'],
-  audio_analogy:      ['analogie',  'badge-analogy'],
-  audio_file:         ['config',    'badge-file'],
-  qa:                 ['Q&A jury',  'badge-qa'],
-  conclusion:         ['conclusion','badge-conclusion'],
+  intro: ['intro', 'badge-intro'], concept: ['concept', 'badge-concept'],
+  method: ['méthode', 'badge-method'], technical: ['technique', 'badge-technical'],
+  security: ['sécurité', 'badge-security'], jury: ['⚠ jury', 'badge-jury'],
+  audio_command: ['commande', 'badge-command'], audio_code: ['code', 'badge-code'],
+  audio_code_explain: ['explication', 'badge-explain'], audio_terminal_tip: ['astuce', 'badge-tip'],
+  audio_analogy: ['analogie', 'badge-analogy'], audio_file: ['config', 'badge-file'],
+  qa: ['Q&A jury', 'badge-qa'], conclusion: ['conclusion', 'badge-conclusion'],
 };
 
-// Durée estimée lisible (pour l'hint hover)
 const SPEED_LABELS = {
-  audio_command: 'lent',
-  audio_code:    'lent',
-  audio_file:    'très lent',
-  audio_code_explain: 'modéré',
-  security:      'modéré',
-  jury:          'modéré',
-  qa:            'modéré',
-  _default:      'normal',
+  audio_command: 'lent', audio_code: 'lent', audio_file: 'très lent',
+  audio_code_explain: 'modéré', security: 'modéré', jury: 'modéré',
+  qa: 'modéré', _default: 'normal',
 };
 
 function renderSection(sectionId, page = 1) {
-  // Arrêter toute lecture en cours
   speechSynthesis.cancel();
-  if (currentBlock) {
-    currentBlock.classList.remove('playing', 'highlighted');
-    currentBlock = null;
-  }
+  if (currentBlock) currentBlock.classList.remove('playing', 'highlighted');
   document.getElementById('status-dot').classList.remove('playing');
 
   const section = COURSE.find(s => s.id === sectionId);
   if (!section) return;
 
   currentSectionId = sectionId;
+  currentPage = page;
 
-  // Mettre à jour la navigation active
   document.querySelectorAll('.nav-item').forEach(b => b.classList.remove('active'));
   const navBtn = document.querySelector(`.nav-item[data-id="${sectionId}"]`);
   if (navBtn) navBtn.classList.add('active');
 
-  // Mettre à jour l'en-tête
   document.getElementById('section-header').innerHTML = `
     <div class="section-title">${section.title}</div>
-    <div class="section-hint">${section.content.length} blocs — cliquez pour lire instantanément</div>
+    <div class="section-hint">${section.content.length} blocs — page ${page}/${Math.ceil(section.content.length / ITEMS_PER_PAGE)}</div>
   `;
 
-  // Pagination
   const paginated = paginateContent(section.content, page);
   renderPagination(paginated.total_pages, page);
 
-  // Rendre les blocs
   const list = document.getElementById('items-list');
   list.innerHTML = '';
 
   paginated.data.forEach((item) => {
     const div = document.createElement('div');
     div.className = 'item-block';
-
     const [label, badgeClass] = TYPE_LABELS[item.type] || [item.type, 'badge-explain'];
     const speedLabel = SPEED_LABELS[item.type] || SPEED_LABELS._default;
 
     let bodyHTML = '';
     if (item.type === 'qa') {
-      bodyHTML = `
-        <div class="qa-question"><span class="qa-q-badge">Q</span>${item.question || ''}</div>
-        <div class="qa-answer">${item.answer || ''}</div>
-      `;
+      bodyHTML = `<div class="qa-question"><span class="qa-q-badge">Q</span>${item.question || ''}</div><div class="qa-answer">${item.answer || ''}</div>`;
     } else if (['audio_command', 'audio_code', 'audio_file'].includes(item.type)) {
       bodyHTML = `<pre class="item-code">${escapeHtml(item.text || '')}</pre>`;
     } else {
@@ -1168,7 +1077,6 @@ function renderSection(sectionId, page = 1) {
       <span class="play-icon">▶</span>
     `;
 
-    // Ajouter un écouteur de clic pour la lecture
     div.addEventListener('click', (e) => {
       e.stopPropagation();
       speak(item, div);
@@ -1180,41 +1088,6 @@ function renderSection(sectionId, page = 1) {
   setStatus(`${paginated.data.length} blocs — cliquez pour lire`);
 }
 
-function paginateContent(content, page) {
-  const total_items = content.length;
-  const total_pages = Math.ceil(total_items / ITEMS_PER_PAGE);
-  const start_idx = (page - 1) * ITEMS_PER_PAGE;
-  const end_idx = start_idx + ITEMS_PER_PAGE;
-  const paginated_data = content.slice(start_idx, end_idx);
-  return {
-    data: paginated_data,
-    page: page,
-    total_pages: total_pages,
-    total_items: total_items
-  };
-}
-
-function renderPagination(totalPages, currentPage) {
-  const paginationDiv = document.getElementById('pagination');
-  paginationDiv.innerHTML = '';
-
-  for (let i = 1; i <= totalPages; i++) {
-    const button = document.createElement('button');
-    button.textContent = i;
-    if (i === currentPage) {
-      button.classList.add('active');
-    }
-    button.addEventListener('click', () => {
-      renderSection(currentSectionId, i);
-    });
-    paginationDiv.appendChild(button);
-  }
-}
-
-function escapeHtml(s) {
-  return s.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
-}
-
 // ─────────────────────────────────────────────────────────
 // NAVIGATION
 // ─────────────────────────────────────────────────────────
@@ -1224,20 +1097,17 @@ function buildNav() {
     const btn = document.createElement('button');
     btn.className = 'nav-item';
     btn.dataset.id = section.id;
-    btn.innerHTML = `
-      <span class="nav-label">${section.title}</span>
-      <span class="progress-dot"></span>
-    `;
+    btn.innerHTML = `<span class="nav-label">${section.title}</span><span class="progress-dot"></span>`;
     btn.addEventListener('click', () => renderSection(section.id));
     nav.appendChild(btn);
   });
 }
 
 // ─────────────────────────────────────────────────────────
-// INIT
+// INITIALISATION
 // ─────────────────────────────────────────────────────────
 buildNav();
-renderSection('intro');
+renderSection('intro', 1);
 
 if (typeof speechSynthesis !== 'undefined') {
   if (speechSynthesis.onvoiceschanged !== undefined) {
@@ -1245,31 +1115,103 @@ if (typeof speechSynthesis !== 'undefined') {
   }
   setTimeout(loadVoices, 300);
 } else {
-  setStatus('⚠ Web Speech non supporté sur ce navigateur');
+  setStatus('⚠ Web Speech API non supportée');
+}
+
+// ─────────────────────────────────────────────────────────
+// UTILITAIRES
+// ─────────────────────────────────────────────────────────
+function escapeHtml(s) {
+  return s.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
+}
+
+function getRate(type) {
+  return RATES[type] || RATES._default;
+}
+
+function buildSpeechText(item) {
+  const t = item.type;
+  const text = item.text || '';
+  const title = item.title || '';
+  const lang = currentLang;
+
+  const prefixes = {
+    fr: {
+      audio_command: 'Commande terminal. ',
+      audio_code: 'Code. ',
+      audio_file: 'Fichier de configuration. ',
+      audio_code_explain: '',
+      audio_terminal_tip: 'Astuce importante. ',
+      audio_analogy: 'Pour mieux comprendre. ',
+      security: 'Point sécurité. ',
+      jury: 'Question piège du jury. ',
+      qa: '',
+      conclusion: 'Pour conclure. ',
+      method: 'Méthode. ',
+      concept: 'Concept clé. ',
+      technical: '',
+      intro: '',
+    },
+    en: {
+      audio_command: 'Terminal command. ',
+      audio_code: 'Code. ',
+      audio_file: 'Configuration file. ',
+      audio_code_explain: '',
+      audio_terminal_tip: 'Important tip. ',
+      audio_analogy: 'To understand better. ',
+      security: 'Security point. ',
+      jury: 'Tricky jury question. ',
+      qa: '',
+      conclusion: 'To conclude. ',
+      method: 'Method. ',
+      concept: 'Key concept. ',
+      technical: '',
+      intro: '',
+    },
+  };
+
+  const prefix = prefixes[lang][t] || '';
+  const titlePart = title ? title + '. ' : '';
+
+  if (t === 'qa') {
+    const q = item.question || '';
+    const a = item.answer || '';
+    return lang === 'fr'
+      ? `Question du jury. ${q}. Réponse. ${a}.`
+      : `Jury question. ${q}. Answer. ${a}.`;
+  }
+
+  return prefix + titlePart + text;
 }
 </script>
 </body>
 </html>"""
-
 
 # ====================== ROUTES ======================
 @api_router.get("/")
 async def api_root():
     return JSONResponse(content={"message": "API ASD Audio Learning v2 - OK"})
 
-
 @api_router.get("/course")
 async def get_course():
     return JSONResponse(content=COURSE_CONTENT)
 
+@api_router.get("/course/{section_id}")
+async def get_section(section_id: str, page: int = 1):
+    section = next((s for s in COURSE_CONTENT if s["id"] == section_id), None)
+    if not section:
+        raise HTTPException(status_code=404, detail="Section non trouvée")
+
+    paginated = {
+        "data": section["content"][(page-1)*ITEMS_PER_PAGE : page*ITEMS_PER_PAGE],
+        "page": page,
+        "total_pages": (len(section["content"]) + ITEMS_PER_PAGE - 1) // ITEMS_PER_PAGE,
+        "total_items": len(section["content"])
+    }
+    return JSONResponse(content=paginated)
 
 @api_router.get("/audio/{section_id}")
 async def get_audio(section_id: str):
-    """
-    Route conservée pour compatibilité et usage hors navigateur (scripts, etc.).
-    Génère un fichier WAV via pyttsx3 côté serveur.
-    Pour la lecture interactive, le frontend utilise directement la Web Speech API.
-    """
     section = next((s for s in COURSE_CONTENT if s["id"] == section_id), None)
     if not section:
         raise HTTPException(status_code=404, detail="Section non trouvée")
@@ -1290,7 +1232,6 @@ async def get_audio(section_id: str):
         headers={"Content-Disposition": f"attachment; filename={section_id}.wav"}
     )
 
-
 @api_router.post("/progress")
 async def save_progress(progress: UserProgress):
     doc = progress.model_dump()
@@ -1302,12 +1243,10 @@ async def save_progress(progress: UserProgress):
     )
     return JSONResponse(content={"status": "saved"})
 
-
 @api_router.get("/progress")
 async def get_progress():
     progress = await db.progress.find({}, {"_id": 0}).to_list(100)
     return JSONResponse(content=progress)
-
 
 app.include_router(api_router)
 
@@ -1321,21 +1260,17 @@ app.add_middleware(
 
 logging.basicConfig(level=logging.INFO)
 
-
 # ====================== SERVE FRONTEND ======================
-import json as _json
-
 def _build_frontend() -> str:
-    """Injecte le contenu du cours dans le HTML frontend."""
+    """Injecte le contenu du cours et la pagination dans le HTML frontend."""
     course_json = _json.dumps(COURSE_CONTENT, ensure_ascii=False)
-    return FRONTEND_HTML.replace('__COURSE_JSON__', course_json)
-
+    frontend_html = FRONTEND_HTML.replace('__COURSE_JSON__', course_json)
+    frontend_html = frontend_html.replace('__ITEMS_PER_PAGE__', str(ITEMS_PER_PAGE))
+    return frontend_html
 
 STATIC_FILES_DIR = STATIC_DIR / "static"
 if STATIC_DIR.exists() and (STATIC_DIR / "index.html").exists():
-    # Si un build frontend statique existe, on le sert en priorité
-    if STATIC_FILES_DIR.exists():
-        app.mount("/static", StaticFiles(directory=str(STATIC_FILES_DIR)), name="static")
+    app.mount("/static", StaticFiles(directory=str(STATIC_FILES_DIR)), name="static")
 
     @app.get("/")
     async def serve_root():
@@ -1349,9 +1284,7 @@ if STATIC_DIR.exists() and (STATIC_DIR / "index.html").exists():
         if file_path.exists() and file_path.is_file():
             return FileResponse(file_path)
         return FileResponse(STATIC_DIR / "index.html")
-
 else:
-    # Pas de build statique → on sert le frontend intégré directement
     @app.get("/")
     async def serve_integrated_frontend():
         return HTMLResponse(content=_build_frontend())
@@ -1361,7 +1294,6 @@ else:
         if full_path.startswith("api"):
             return JSONResponse({"error": "Not found"}, status_code=404)
         return HTMLResponse(content=_build_frontend())
-
 
 @app.on_event("shutdown")
 async def shutdown_db_client():
