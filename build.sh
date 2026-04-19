@@ -1,20 +1,19 @@
 #!/bin/bash
-# Build script for Render - builds frontend and copies to backend
-set -e  # Arrête le script en cas d'erreur
+# Build script for Render - builds React frontend (with CRACO) and copies to Django static
+set -e  # Stop on any error
 
 echo "📦 Installing frontend dependencies..."
+
 cd frontend
 
-# Installation des dépendances avec gestion des peer dependencies
-npm ci || npm install --legacy-peer-deps
-
-# Installation des dépendances critiques spécifiques
-npm install date-fns@^3.0.0 @babel/core@^7.25.2 react-is@^18.2.0 typescript@^4.9.0 --save-dev
+# Use Yarn since your project is configured for it (better consistency)
+yarn install --frozen-lockfile
 
 echo "🔨 Building frontend..."
-REACT_APP_BACKEND_URL="" npm run build
+# Clear REACT_APP_BACKEND_URL or set it if needed for production
+REACT_APP_BACKEND_URL="" yarn build
 
-echo "📁 Copying build to backend/static..."
+echo "📁 Copying build output to backend/static..."
 rm -rf ../backend/static
 mkdir -p ../backend/static
 cp -r build/* ../backend/static/
@@ -23,4 +22,4 @@ echo "📦 Installing backend dependencies..."
 cd ../backend
 pip install -r requirements.txt --upgrade
 
-echo "✅ Build complete!"
+echo "✅ Build completed successfully!"
