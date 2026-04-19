@@ -957,7 +957,10 @@ function buildSpeechText(item) {
 // ─────────────────────────────────────────────────────────
 function loadVoices() {
   const all = speechSynthesis.getVoices();
-  if (!all.length) return;
+  if (!all.length) {
+    setTimeout(loadVoices, 100); // Réessayer si les voix ne sont pas encore chargées
+    return;
+  }
   voices = all;
   frVoices = all.filter(v => v.lang.startsWith('fr'));
   enVoices = all.filter(v => v.lang.startsWith('en'));
@@ -992,45 +995,70 @@ function setLang(lang) {
   document.getElementById('btn-en').classList.toggle('active', lang === 'en');
   loadVoices();
   setStatus('Langue changée — cliquez pour relire');
+  // Recharger la section actuelle pour appliquer la nouvelle langue
+  if (currentSectionId) {
+    renderSection(currentSectionId);
+  }
 }
 
 function speak(item, blockEl) {
+  // Arrêter toute lecture en cours
   speechSynthesis.cancel();
 
+  // Réinitialiser l'état visuel du bloc précédent
   if (currentBlock) {
     currentBlock.classList.remove('playing', 'highlighted');
   }
-  currentBlock = blockEl;
-  blockEl.classList.add('playing');
 
+  // Mettre à jour le bloc actuel
+  currentBlock = blockEl;
+  currentBlock.classList.add('playing');
+
+  // Mettre à jour l'indicateur de statut
   const dot = document.getElementById('status-dot');
   dot.classList.add('playing');
 
+  // Construire le texte à lire
   const text = buildSpeechText(item);
   const rate = getRate(item.type);
 
-  setStatus(`Lecture… (×${rate.toFixed(2)})`);
+  // Mettre à jour le statut
+  setStatus(`Lecture en cours... (vitesse ×${rate.toFixed(2)})`);
 
+  // Créer l'énoncé de synthèse vocale
   const utt = new SpeechSynthesisUtterance(text);
   utt.lang = currentLang === 'fr' ? 'fr-FR' : 'en-US';
   utt.rate = rate;
-  const v = getSelectedVoice();
-  if (v) utt.voice = v;
 
+  // Sélectionner une voix si disponible
+  const voice = getSelectedVoice();
+  if (voice) {
+    utt.voice = voice;
+  }
+
+  // Gérer la fin de la lecture
   utt.onend = () => {
-    blockEl.classList.remove('playing');
-    blockEl.classList.add('highlighted');
+    if (currentBlock) {
+      currentBlock.classList.remove('playing');
+      currentBlock.classList.add('highlighted');
+    }
     dot.classList.remove('playing');
     currentBlock = null;
-    setStatus('Terminé — cliquez pour lire un autre bloc');
-  };
-  utt.onerror = (e) => {
-    blockEl.classList.remove('playing');
-    dot.classList.remove('playing');
-    setStatus('Erreur de lecture');
-    currentBlock = null;
+    setStatus('Lecture terminée. Cliquez sur un autre bloc pour lire.');
   };
 
+  // Gérer les erreurs
+  utt.onerror = (e) => {
+    console.error('Erreur de synthèse vocale:', e);
+    if (currentBlock) {
+      currentBlock.classList.remove('playing');
+    }
+    dot.classList.remove('playing');
+    currentBlock = null;
+    setStatus('Erreur de lecture. Veuillez réessayer.');
+  };
+
+  // Démarrer la lecture
   speechSynthesis.speak(utt);
 }
 
@@ -1080,30 +1108,40 @@ const SPEED_LABELS = {
   _default:      'normal',
 };
 
-function renderSection(sectionId) {
+function renderSection(sectionId, page = 1) {
+  // Arrêter toute lecture en cours
   speechSynthesis.cancel();
-  if (currentBlock) { currentBlock.classList.remove('playing','highlighted'); currentBlock = null; }
+  if (currentBlock) {
+    currentBlock.classList.remove('playing', 'highlighted');
+    currentBlock = null;
+  }
   document.getElementById('status-dot').classList.remove('playing');
 
   const section = COURSE.find(s => s.id === sectionId);
   if (!section) return;
 
-  // Nav active
+  currentSectionId = sectionId;
+
+  // Mettre à jour la navigation active
   document.querySelectorAll('.nav-item').forEach(b => b.classList.remove('active'));
   const navBtn = document.querySelector(`.nav-item[data-id="${sectionId}"]`);
   if (navBtn) navBtn.classList.add('active');
 
-  // Header
+  // Mettre à jour l'en-tête
   document.getElementById('section-header').innerHTML = `
     <div class="section-title">${section.title}</div>
     <div class="section-hint">${section.content.length} blocs — cliquez pour lire instantanément</div>
   `;
 
-  // Items
+  // Pagination
+  const paginated = paginateContent(section.content, page);
+  renderPagination(paginated.total_pages, page);
+
+  // Rendre les blocs
   const list = document.getElementById('items-list');
   list.innerHTML = '';
 
-  section.content.forEach((item) => {
+  paginated.data.forEach((item) => {
     const div = document.createElement('div');
     div.className = 'item-block';
 
@@ -1111,13 +1149,12 @@ function renderSection(sectionId) {
     const speedLabel = SPEED_LABELS[item.type] || SPEED_LABELS._default;
 
     let bodyHTML = '';
-
     if (item.type === 'qa') {
       bodyHTML = `
         <div class="qa-question"><span class="qa-q-badge">Q</span>${item.question || ''}</div>
         <div class="qa-answer">${item.answer || ''}</div>
       `;
-    } else if (['audio_command','audio_code','audio_file'].includes(item.type)) {
+    } else if (['audio_command', 'audio_code', 'audio_file'].includes(item.type)) {
       bodyHTML = `<pre class="item-code">${escapeHtml(item.text || '')}</pre>`;
     } else {
       const titleHTML = item.title ? `<div class="item-title">${escapeHtml(item.title)}</div>` : '';
@@ -1131,19 +1168,51 @@ function renderSection(sectionId) {
       <span class="play-icon">▶</span>
     `;
 
-    div.addEventListener('click', () => speak(item, div));
+    // Ajouter un écouteur de clic pour la lecture
+    div.addEventListener('click', (e) => {
+      e.stopPropagation();
+      speak(item, div);
+    });
+
     list.appendChild(div);
   });
 
-  setStatus(`${section.content.length} blocs — cliquez pour lire`);
+  setStatus(`${paginated.data.length} blocs — cliquez pour lire`);
+}
 
-  // Marquer comme visité
-  progress[sectionId] = true;
-  if (navBtn) navBtn.classList.add('done');
+function paginateContent(content, page) {
+  const total_items = content.length;
+  const total_pages = Math.ceil(total_items / ITEMS_PER_PAGE);
+  const start_idx = (page - 1) * ITEMS_PER_PAGE;
+  const end_idx = start_idx + ITEMS_PER_PAGE;
+  const paginated_data = content.slice(start_idx, end_idx);
+  return {
+    data: paginated_data,
+    page: page,
+    total_pages: total_pages,
+    total_items: total_items
+  };
+}
+
+function renderPagination(totalPages, currentPage) {
+  const paginationDiv = document.getElementById('pagination');
+  paginationDiv.innerHTML = '';
+
+  for (let i = 1; i <= totalPages; i++) {
+    const button = document.createElement('button');
+    button.textContent = i;
+    if (i === currentPage) {
+      button.classList.add('active');
+    }
+    button.addEventListener('click', () => {
+      renderSection(currentSectionId, i);
+    });
+    paginationDiv.appendChild(button);
+  }
 }
 
 function escapeHtml(s) {
-  return s.replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;');
+  return s.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
 }
 
 // ─────────────────────────────────────────────────────────
