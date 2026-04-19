@@ -6,8 +6,11 @@ set -e  # Arrête le script en cas d'erreur
 echo "📦 Installing frontend dependencies..."
 cd frontend
 
-# Utiliser legacy-peer-deps pour éviter les conflits
-yarn install --frozen-lockfile --legacy-peer-deps
+# D'abord essayer avec le lockfile existant
+if ! yarn install --frozen-lockfile --legacy-peer-deps; then
+    echo "⚠️ Lockfile outdated, updating dependencies..."
+    yarn install --legacy-peer-deps
+fi
 
 # Installer les dépendances manquantes spécifiques
 yarn add date-fns@^3.0.0
