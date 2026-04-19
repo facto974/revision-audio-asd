@@ -70,7 +70,6 @@ function App() {
   const continuousPlayRef = useRef(false);
   const currentIndexRef = useRef(0);
   const primedRef = useRef(false);
-  const keepAliveRef = useRef(null);
   const isAndroidRef = useRef(/Android/i.test(navigator.userAgent));
 
   // Detect mobile
@@ -115,11 +114,10 @@ function App() {
     return () => timers.forEach(clearTimeout);
   }, [selectedVoice]);
 
-  // Cleanup keep-alive on unmount
+  // Cleanup on unmount
   useEffect(() => {
     const synth = synthRef.current;
     return () => {
-      if (keepAliveRef.current) clearInterval(keepAliveRef.current);
       try { synth.cancel(); } catch { /* ignore */ }
     };
   }, []);
@@ -209,28 +207,8 @@ function App() {
     return chunks;
   }, []);
 
-  // Keep Chrome speech engine alive
-  const startKeepAlive = useCallback(() => {
-    if (keepAliveRef.current) clearInterval(keepAliveRef.current);
-    keepAliveRef.current = setInterval(() => {
-      const s = synthRef.current;
-      if (s.speaking && !s.paused) {
-        try {
-          s.pause();
-          s.resume();
-        } catch { /* ignore */ }
-      }
-    }, 8000);
-  }, []);
-
-  const stopKeepAlive = useCallback(() => {
-    if (keepAliveRef.current) {
-      clearInterval(keepAliveRef.current);
-      keepAliveRef.current = null;
-    }
-  }, []);
-
-  // Core speak function - works on mobile
+  // Core speak function - queues ALL chunks upfront for reliable mobile playback.
+  // This avoids the "user gesture lost" issue on Android when chaining via onend.
   const speak = useCallback((text, onEnd) => {
     const synth = synthRef.current;
 
@@ -242,13 +220,15 @@ function App() {
     // Prime the engine on first user interaction (required on Android Chrome)
     if (!primedRef.current) {
       try {
-        const primer = new SpeechSynthesisUtterance('');
+        const primer = new SpeechSynthesisUtterance(' ');
         primer.volume = 0;
+        primer.rate = 1;
         synth.speak(primer);
       } catch { /* ignore */ }
       primedRef.current = true;
     }
 
+    // Cancel previous speech (kept synchronous — no setTimeout)
     synth.cancel();
 
     const chunks = chunkText(text, isAndroidRef.current ? 140 : 200);
@@ -257,20 +237,13 @@ function App() {
       return;
     }
 
-    let chunkIndex = 0;
-    let started = false;
-    let cancelled = false;
+    let finished = 0;
+    let firstStartFired = false;
 
-    const speakChunk = () => {
-      if (cancelled) return;
-      if (chunkIndex >= chunks.length) {
-        setIsPlaying(false);
-        stopKeepAlive();
-        if (onEnd) onEnd();
-        return;
-      }
-
-      const utter = new SpeechSynthesisUtterance(chunks[chunkIndex]);
+    // Queue all utterances immediately inside the same user gesture.
+    // The browser's internal queue will play them sequentially and reliably.
+    chunks.forEach((chunk, idx) => {
+      const utter = new SpeechSynthesisUtterance(chunk);
       if (selectedVoice) utter.voice = selectedVoice;
       utter.rate = speed;
       utter.lang = (selectedVoice && selectedVoice.lang) || 'fr-FR';
@@ -278,39 +251,38 @@ function App() {
       utter.pitch = 1;
 
       utter.onstart = () => {
-        if (!started) {
-          started = true;
+        if (!firstStartFired) {
+          firstStartFired = true;
           setIsPlaying(true);
-          startKeepAlive();
         }
       };
 
       utter.onend = () => {
-        chunkIndex += 1;
-        speakChunk();
+        finished += 1;
+        if (idx === chunks.length - 1) {
+          setIsPlaying(false);
+          if (onEnd) onEnd();
+        }
       };
 
       utter.onerror = (e) => {
         if (e && (e.error === 'canceled' || e.error === 'interrupted')) {
-          cancelled = true;
           return;
         }
-        console.warn('Speech error:', e && e.error);
-        chunkIndex += 1;
-        speakChunk();
+        console.warn('Speech error on chunk', idx, ':', e && e.error);
+        if (idx === chunks.length - 1 && finished < chunks.length) {
+          setIsPlaying(false);
+          if (onEnd) onEnd();
+        }
       };
 
       try {
         synth.speak(utter);
       } catch (err) {
-        console.warn('speak() threw:', err);
-        chunkIndex += 1;
-        speakChunk();
+        console.warn('speak() threw on chunk', idx, ':', err);
       }
-    };
-
-    speakChunk();
-  }, [selectedVoice, speed, chunkText, startKeepAlive, stopKeepAlive]);
+    });
+  }, [selectedVoice, speed, chunkText]);
 
   const handleBlockClick = useCallback((index) => {
     continuousPlayRef.current = false;
@@ -371,22 +343,20 @@ function App() {
     if (isPlaying) {
       synthRef.current.cancel();
       continuousPlayRef.current = false;
-      stopKeepAlive();
       setIsPlaying(false);
     } else {
       startContinuousPlay();
     }
-  }, [isPlaying, startContinuousPlay, stopKeepAlive]);
+  }, [isPlaying, startContinuousPlay]);
 
   const stopPlayback = useCallback(() => {
     synthRef.current.cancel();
     continuousPlayRef.current = false;
-    stopKeepAlive();
     setIsPlaying(false);
     setCurrentBlockIndex(0);
     currentIndexRef.current = 0;
     setProgress(0);
-  }, [stopKeepAlive]);
+  }, []);
 
   const changeSection = useCallback((section) => {
     stopPlayback();
