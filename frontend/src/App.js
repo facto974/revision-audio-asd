@@ -69,6 +69,9 @@ function App() {
   const synthRef = useRef(window.speechSynthesis);
   const continuousPlayRef = useRef(false);
   const currentIndexRef = useRef(0);
+  const primedRef = useRef(false);
+  const keepAliveRef = useRef(null);
+  const isAndroidRef = useRef(/Android/i.test(navigator.userAgent));
 
   // Detect mobile
   useEffect(() => {
@@ -81,32 +84,45 @@ function App() {
     const loadVoices = () => {
       const availableVoices = synthRef.current.getVoices();
       if (availableVoices.length > 0) {
-        // On mobile, prefer any French voice available
         const frenchVoices = availableVoices.filter(
-          v => v.lang.startsWith('fr') && !v.lang.includes('CA')
+          v => v.lang && v.lang.toLowerCase().startsWith('fr')
         );
-        // Fallback to any voice if no French
         const voicesToUse = frenchVoices.length > 0 ? frenchVoices : availableVoices;
         setVoices(voicesToUse);
         if (!selectedVoice && voicesToUse.length > 0) {
-          const frFR = voicesToUse.find(v => v.lang === 'fr-FR');
-          setSelectedVoice(frFR || voicesToUse[0]);
+          const isAndroid = /Android/i.test(navigator.userAgent);
+          let chosen = null;
+          if (isAndroid) {
+            chosen = voicesToUse.find(v => v.localService && v.lang === 'fr-FR')
+                 || voicesToUse.find(v => v.localService)
+                 || voicesToUse.find(v => v.lang === 'fr-FR')
+                 || voicesToUse[0];
+          } else {
+            chosen = voicesToUse.find(v => v.lang === 'fr-FR') || voicesToUse[0];
+          }
+          setSelectedVoice(chosen);
         }
       }
     };
     
-    // Initial load
     loadVoices();
     
-    // Listen for voices changed (needed for some browsers)
     if (synthRef.current.onvoiceschanged !== undefined) {
       synthRef.current.onvoiceschanged = loadVoices;
     }
     
-    // Retry for mobile browsers that load voices async
-    const intervals = [100, 250, 500, 1000, 2000];
-    intervals.forEach(ms => setTimeout(loadVoices, ms));
+    const timers = [100, 250, 500, 1000, 2000].map(ms => setTimeout(loadVoices, ms));
+    return () => timers.forEach(clearTimeout);
   }, [selectedVoice]);
+
+  // Cleanup keep-alive on unmount
+  useEffect(() => {
+    const synth = synthRef.current;
+    return () => {
+      if (keepAliveRef.current) clearInterval(keepAliveRef.current);
+      try { synth.cancel(); } catch { /* ignore */ }
+    };
+  }, []);
 
   // Transform technical content for audio
   const transformTextForAudio = useCallback((text) => {
@@ -132,7 +148,6 @@ function App() {
     return t.trim();
   }, []);
 
-  // Get text for a block
   const getBlockText = useCallback((block) => {
     let text = "";
     if (block.title) text += block.title + ". ";
@@ -142,7 +157,6 @@ function App() {
     return transformTextForAudio(text);
   }, [transformTextForAudio]);
 
-  // Mark section complete
   const markSectionComplete = useCallback(() => {
     if (!currentSection) return;
     const newCompleted = new Set([...completedSections, currentSection.id]);
@@ -152,60 +166,152 @@ function App() {
     saveProgressToStorage(progressData);
   }, [currentSection, completedSections]);
 
+  // Split text into speakable chunks (fixes Chrome Android ~15s cutoff bug)
+  const chunkText = useCallback((text, maxLen = 160) => {
+    if (!text) return [];
+    const sentences = text.match(/[^.!?\n]+[.!?\n]+|[^.!?\n]+$/g) || [text];
+    const chunks = [];
+    for (const s of sentences) {
+      const sentence = s.trim();
+      if (!sentence) continue;
+      if (sentence.length <= maxLen) {
+        chunks.push(sentence);
+      } else {
+        const parts = sentence.split(/,\s+/);
+        let buf = '';
+        for (const part of parts) {
+          if ((buf + ', ' + part).length > maxLen && buf) {
+            chunks.push(buf.trim());
+            buf = part;
+          } else {
+            buf = buf ? buf + ', ' + part : part;
+          }
+        }
+        if (buf.trim()) {
+          if (buf.length > maxLen) {
+            const words = buf.split(' ');
+            let w = '';
+            for (const word of words) {
+              if ((w + ' ' + word).length > maxLen && w) {
+                chunks.push(w.trim());
+                w = word;
+              } else {
+                w = w ? w + ' ' + word : word;
+              }
+            }
+            if (w.trim()) chunks.push(w.trim());
+          } else {
+            chunks.push(buf.trim());
+          }
+        }
+      }
+    }
+    return chunks;
+  }, []);
+
+  // Keep Chrome speech engine alive
+  const startKeepAlive = useCallback(() => {
+    if (keepAliveRef.current) clearInterval(keepAliveRef.current);
+    keepAliveRef.current = setInterval(() => {
+      const s = synthRef.current;
+      if (s.speaking && !s.paused) {
+        try {
+          s.pause();
+          s.resume();
+        } catch { /* ignore */ }
+      }
+    }, 8000);
+  }, []);
+
+  const stopKeepAlive = useCallback(() => {
+    if (keepAliveRef.current) {
+      clearInterval(keepAliveRef.current);
+      keepAliveRef.current = null;
+    }
+  }, []);
+
   // Core speak function - works on mobile
   const speak = useCallback((text, onEnd) => {
-    // Cancel any ongoing speech
-    synthRef.current.cancel();
-    
+    const synth = synthRef.current;
+
     if (!text || text.trim() === '') {
       if (onEnd) onEnd();
       return;
     }
 
-    const utterance = new SpeechSynthesisUtterance(text);
-    
-    // Set voice - important for mobile
-    if (selectedVoice) {
-      utterance.voice = selectedVoice;
-    }
-    utterance.rate = speed;
-    utterance.lang = 'fr-FR';
-    utterance.volume = 1;
-    utterance.pitch = 1;
-
-    utterance.onstart = () => {
-      setIsPlaying(true);
-    };
-
-    utterance.onend = () => {
-      setIsPlaying(false);
-      if (onEnd) onEnd();
-    };
-
-    utterance.onerror = (e) => {
-      console.log('Speech error:', e);
-      setIsPlaying(false);
-      if (onEnd) onEnd();
-    };
-
-    // iOS fix: ensure speech synthesis is resumed
-    if (synthRef.current.paused) {
-      synthRef.current.resume();
+    // Prime the engine on first user interaction (required on Android Chrome)
+    if (!primedRef.current) {
+      try {
+        const primer = new SpeechSynthesisUtterance('');
+        primer.volume = 0;
+        synth.speak(primer);
+      } catch { /* ignore */ }
+      primedRef.current = true;
     }
 
-    synthRef.current.speak(utterance);
+    synth.cancel();
 
-    // iOS fix: Chrome on iOS sometimes needs a kick
-    if (isMobile) {
-      setTimeout(() => {
-        if (synthRef.current.paused) {
-          synthRef.current.resume();
+    const chunks = chunkText(text, isAndroidRef.current ? 140 : 200);
+    if (chunks.length === 0) {
+      if (onEnd) onEnd();
+      return;
+    }
+
+    let chunkIndex = 0;
+    let started = false;
+    let cancelled = false;
+
+    const speakChunk = () => {
+      if (cancelled) return;
+      if (chunkIndex >= chunks.length) {
+        setIsPlaying(false);
+        stopKeepAlive();
+        if (onEnd) onEnd();
+        return;
+      }
+
+      const utter = new SpeechSynthesisUtterance(chunks[chunkIndex]);
+      if (selectedVoice) utter.voice = selectedVoice;
+      utter.rate = speed;
+      utter.lang = (selectedVoice && selectedVoice.lang) || 'fr-FR';
+      utter.volume = 1;
+      utter.pitch = 1;
+
+      utter.onstart = () => {
+        if (!started) {
+          started = true;
+          setIsPlaying(true);
+          startKeepAlive();
         }
-      }, 100);
-    }
-  }, [selectedVoice, speed, isMobile]);
+      };
 
-  // Play single block (on click)
+      utter.onend = () => {
+        chunkIndex += 1;
+        speakChunk();
+      };
+
+      utter.onerror = (e) => {
+        if (e && (e.error === 'canceled' || e.error === 'interrupted')) {
+          cancelled = true;
+          return;
+        }
+        console.warn('Speech error:', e && e.error);
+        chunkIndex += 1;
+        speakChunk();
+      };
+
+      try {
+        synth.speak(utter);
+      } catch (err) {
+        console.warn('speak() threw:', err);
+        chunkIndex += 1;
+        speakChunk();
+      }
+    };
+
+    speakChunk();
+  }, [selectedVoice, speed, chunkText, startKeepAlive, stopKeepAlive]);
+
   const handleBlockClick = useCallback((index) => {
     continuousPlayRef.current = false;
     currentIndexRef.current = index;
@@ -214,19 +320,15 @@ function App() {
     const text = getBlockText(currentSection.content[index]);
     setProgress(((index + 1) / currentSection.content.length) * 100);
     
-    speak(text, () => {
-      // Single block done
-    });
+    speak(text, () => {});
   }, [currentSection, getBlockText, speak]);
 
-  // Play next block in sequence
   const playNextBlock = useCallback(() => {
     if (!continuousPlayRef.current) return;
     
     const nextIndex = currentIndexRef.current + 1;
     
     if (nextIndex >= currentSection.content.length) {
-      // Section complete
       setIsPlaying(false);
       continuousPlayRef.current = false;
       markSectionComplete();
@@ -239,22 +341,18 @@ function App() {
     const text = getBlockText(currentSection.content[nextIndex]);
     setProgress(((nextIndex + 1) / currentSection.content.length) * 100);
 
-    // Skip empty blocks
     if (!text || text.trim() === '') {
       playNextBlock();
       return;
     }
 
     speak(text, () => {
-      // When this block ends, play next
       if (continuousPlayRef.current) {
-        // Small delay between blocks for natural pacing
         setTimeout(playNextBlock, 300);
       }
     });
   }, [currentSection, getBlockText, speak, markSectionComplete]);
 
-  // Start continuous play
   const startContinuousPlay = useCallback(() => {
     continuousPlayRef.current = true;
     currentIndexRef.current = currentBlockIndex;
@@ -269,28 +367,27 @@ function App() {
     });
   }, [currentBlockIndex, currentSection, getBlockText, speak, playNextBlock]);
 
-  // Toggle play/pause
   const togglePlay = useCallback(() => {
     if (isPlaying) {
       synthRef.current.cancel();
       continuousPlayRef.current = false;
+      stopKeepAlive();
       setIsPlaying(false);
     } else {
       startContinuousPlay();
     }
-  }, [isPlaying, startContinuousPlay]);
+  }, [isPlaying, startContinuousPlay, stopKeepAlive]);
 
-  // Stop playback
   const stopPlayback = useCallback(() => {
     synthRef.current.cancel();
     continuousPlayRef.current = false;
+    stopKeepAlive();
     setIsPlaying(false);
     setCurrentBlockIndex(0);
     currentIndexRef.current = 0;
     setProgress(0);
-  }, []);
+  }, [stopKeepAlive]);
 
-  // Change section
   const changeSection = useCallback((section) => {
     stopPlayback();
     setCurrentSection(section);
@@ -300,7 +397,6 @@ function App() {
     setSidebarOpen(false);
   }, [stopPlayback]);
 
-  // Navigate sections
   const navigateSection = useCallback((direction) => {
     const idx = course.findIndex(s => s.id === currentSection?.id);
     const newIdx = idx + direction;
@@ -309,7 +405,6 @@ function App() {
     }
   }, [course, currentSection, changeSection]);
 
-  // Change speed
   const changeSpeed = useCallback((newSpeed) => {
     setSpeed(parseFloat(newSpeed));
     if (isPlaying) {
@@ -317,7 +412,6 @@ function App() {
     }
   }, [isPlaying, stopPlayback]);
 
-  // Change voice
   const changeVoice = useCallback((voiceName) => {
     const voice = voices.find(v => v.name === voiceName);
     if (voice) {
@@ -328,7 +422,6 @@ function App() {
     }
   }, [voices, isPlaying, stopPlayback]);
 
-  // Get short voice name
   const getShortVoiceName = (voice) => {
     if (!voice) return "Voix";
     const name = voice.name;
@@ -338,7 +431,6 @@ function App() {
     return name;
   };
 
-  // Render block
   const renderBlock = (block, index) => {
     const isActive = index === currentBlockIndex && isPlaying;
     const isCurrent = index === currentBlockIndex;
