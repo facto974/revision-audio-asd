@@ -141,6 +141,13 @@
     display: block;
 }
 
+.section-hint {
+    font-size: 13px;
+    color: #9CA3AF;
+    margin-top: 8px;
+    font-style: italic;
+}
+
 /* Course content styles */
 .section-title {
     font-family: 'IBM Plex Sans', sans-serif;
@@ -156,10 +163,33 @@
     line-height: 1.75;
     border-radius: 12px;
     transition: all 200ms ease-in-out;
+    cursor: pointer;
+    position: relative;
 }
 
 .content-block:hover {
     transform: translateX(4px);
+    box-shadow: 0 2px 8px rgba(0, 0, 0, 0.08);
+}
+
+.content-block:hover .block-play-indicator {
+    opacity: 1;
+}
+
+.block-play-indicator {
+    position: absolute;
+    top: 12px;
+    right: 12px;
+    width: 28px;
+    height: 28px;
+    background: rgba(37, 99, 235, 0.1);
+    border-radius: 50%;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    opacity: 0;
+    transition: opacity 200ms ease-in-out;
+    color: #2563EB;
 }
 
 .content-block.speech-highlight {
@@ -167,8 +197,20 @@
     transform: scale(1.01);
 }
 
-.content-block.block-past {
-    opacity: 0.6;
+.content-block.speech-highlight .block-play-indicator {
+    opacity: 1;
+    background: #2563EB;
+    color: white;
+    animation: pulse 1.5s infinite;
+}
+
+.content-block.block-current {
+    box-shadow: 0 0 0 2px #93C5FD;
+}
+
+@keyframes pulse {
+    0%, 100% { transform: scale(1); }
+    50% { transform: scale(1.1); }
 }
 
 .content-intro {

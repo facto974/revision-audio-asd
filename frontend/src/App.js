@@ -27,7 +27,8 @@ import {
   Layers,
   BarChart,
   Globe,
-  Wrench
+  Wrench,
+  Volume1
 } from "lucide-react";
 
 const BACKEND_URL = process.env.REACT_APP_BACKEND_URL || "";
@@ -61,6 +62,7 @@ function App() {
   const [speed, setSpeed] = useState(1);
   const [sidebarOpen, setSidebarOpen] = useState(false);
   const [progress, setProgress] = useState(0);
+  const [continuousPlay, setContinuousPlay] = useState(true);
   
   const utteranceRef = useRef(null);
   const synthRef = useRef(window.speechSynthesis);
@@ -140,6 +142,111 @@ function App() {
     loadProgress();
   }, []);
 
+  // Transform technical content for better audio reading
+  const transformTextForAudio = useCallback((text) => {
+    if (!text) return "";
+    
+    let audioText = text;
+    
+    // Replace common technical patterns for better pronunciation
+    const replacements = [
+      // File extensions
+      [/\.tf\b/g, " point TF"],
+      [/\.yml\b/g, " point YAML"],
+      [/\.yaml\b/g, " point YAML"],
+      [/\.py\b/g, " point PY"],
+      [/\.js\b/g, " point JS"],
+      [/\.json\b/g, " point JSON"],
+      [/\.sh\b/g, " point SH"],
+      [/\.env\b/g, " point ENV"],
+      [/\.j2\b/g, " point J2"],
+      [/\.md\b/g, " point MD"],
+      [/\.ini\b/g, " point INI"],
+      
+      // Common commands - pronounce naturally
+      [/\bssh-keygen\b/gi, "SSH keygen"],
+      [/\bssh-copy-id\b/gi, "SSH copy ID"],
+      [/\bdocker-compose\b/gi, "docker compose"],
+      [/\bkubectl\b/gi, "kube control"],
+      [/\bsystemctl\b/gi, "system control"],
+      [/\bansible-playbook\b/gi, "ansible playbook"],
+      [/\bufw\b/gi, "UFW"],
+      [/\bsshd_config\b/gi, "SSH D config"],
+      [/\bfail2ban\b/gi, "fail 2 ban"],
+      [/\bnginx\b/gi, "engine X"],
+      [/\bterraform\.tfstate\b/gi, "terraform TF state"],
+      [/\btfstate\b/gi, "TF state"],
+      [/\bpytest\b/gi, "py test"],
+      [/\bstreamlit\b/gi, "streamlit"],
+      
+      // Network notations
+      [/\/32\b/g, " slash 32"],
+      [/\/24\b/g, " slash 24"],
+      [/\/16\b/g, " slash 16"],
+      [/0\.0\.0\.0\/0/g, "0.0.0.0 slash 0"],
+      [/\bCIDR\b/gi, "CIDR"],
+      
+      // Ports
+      [/port\s*(\d+)/gi, "port $1"],
+      [/:(\d{4,5})\b/g, " port $1"],
+      
+      // Common abbreviations
+      [/\bCI\/CD\b/gi, "CI CD"],
+      [/\bIaC\b/g, "Infrastructure as Code"],
+      [/\bSLI\b/g, "SLI"],
+      [/\bSLO\b/g, "SLO"],
+      [/\bSLA\b/g, "SLA"],
+      [/\bEC2\b/g, "EC2"],
+      [/\bVPC\b/g, "VPC"],
+      [/\bS3\b/g, "S3"],
+      [/\bAWS\b/g, "AWS"],
+      [/\bHTTPS?\b/g, "HTTP"],
+      [/\bSSH\b/g, "SSH"],
+      [/\bAPI\b/g, "API"],
+      [/\bURL\b/g, "URL"],
+      [/\bIP\b/g, "IP"],
+      [/\bOS\b/g, "OS"],
+      [/\bRAM\b/g, "RAM"],
+      [/\bCPU\b/g, "CPU"],
+      [/\bDNS\b/g, "DNS"],
+      [/\bTCP\b/g, "TCP"],
+      [/\bUDP\b/g, "UDP"],
+      [/\bYAML\b/gi, "YAML"],
+      [/\bHCL\b/g, "HCL"],
+      [/\bJSON\b/gi, "JSON"],
+      
+      // Docker/K8s terms
+      [/\bt2\.micro\b/g, "T2 micro"],
+      [/\bED25519\b/gi, "ED 25519"],
+      [/\b-slim\b/g, " slim"],
+      [/\b--check\b/g, " check"],
+      [/\b-m\b/g, " moins M"],
+      [/\b-d\b/g, " moins D"],
+      [/\b-f\b/g, " moins F"],
+      [/\b-p\b/g, " moins P"],
+      [/\b-r\b/g, " moins R"],
+      [/\b-y\b/g, " moins Y"],
+      [/\b-i\b/g, " moins I"],
+      [/\b-it\b/g, " moins IT"],
+      
+      // Symbols in context
+      [/=>/g, " implique "],
+      [/<-/g, " reçoit "],
+      [/->/g, " vers "],
+      [/\|\|/g, " ou "],
+      [/&&/g, " et "],
+      
+      // Clean up multiple spaces
+      [/\s+/g, " "],
+    ];
+    
+    for (const [pattern, replacement] of replacements) {
+      audioText = audioText.replace(pattern, replacement);
+    }
+    
+    return audioText.trim();
+  }, []);
+
   // Get text content for a block
   const getBlockText = useCallback((block) => {
     let text = "";
@@ -154,10 +261,59 @@ function App() {
     } else if (block.text) {
       text += block.text;
     }
-    return text;
-  }, []);
+    
+    // Transform for better audio
+    return transformTextForAudio(text);
+  }, [transformTextForAudio]);
 
-  // Speak current block
+  // Speak a single block (used for click-to-play)
+  const speakSingleBlock = useCallback((index) => {
+    if (!currentSection || !currentSection.content[index]) return;
+    
+    synthRef.current.cancel();
+    setCurrentBlockIndex(index);
+    
+    const block = currentSection.content[index];
+    const text = getBlockText(block);
+    
+    if (!text || text.trim() === '') return;
+    
+    const utterance = new SpeechSynthesisUtterance(text);
+    
+    if (selectedVoice) {
+      utterance.voice = selectedVoice;
+    }
+    utterance.rate = speed;
+    utterance.lang = 'fr-FR';
+    utterance.pitch = 1;
+    utterance.volume = 1;
+    
+    utterance.onstart = () => {
+      setIsPlaying(true);
+    };
+    
+    utterance.onend = () => {
+      setIsPlaying(false);
+      const progressPercent = ((index + 1) / currentSection.content.length) * 100;
+      setProgress(progressPercent);
+    };
+    
+    utterance.onerror = (e) => {
+      console.error("Speech error:", e);
+      setIsPlaying(false);
+    };
+    
+    utteranceRef.current = utterance;
+    
+    try {
+      synthRef.current.speak(utterance);
+    } catch (err) {
+      console.error("Speech synthesis error:", err);
+      setIsPlaying(false);
+    }
+  }, [currentSection, selectedVoice, speed, getBlockText]);
+
+  // Speak current block with continuous play
   const speakBlock = useCallback((index) => {
     if (!currentSection || !currentSection.content[index]) return;
     
@@ -168,7 +324,7 @@ function App() {
     
     if (!text || text.trim() === '') {
       const nextIndex = index + 1;
-      if (nextIndex < currentSection.content.length) {
+      if (nextIndex < currentSection.content.length && continuousPlay) {
         setCurrentBlockIndex(nextIndex);
         setTimeout(() => speakBlock(nextIndex), 100);
       }
@@ -187,19 +343,21 @@ function App() {
     
     utterance.onend = () => {
       const nextIndex = index + 1;
-      if (nextIndex < currentSection.content.length) {
+      if (nextIndex < currentSection.content.length && continuousPlay) {
         setCurrentBlockIndex(nextIndex);
         setTimeout(() => speakBlock(nextIndex), 300);
       } else {
         setIsPlaying(false);
-        markSectionComplete();
+        if (nextIndex >= currentSection.content.length) {
+          markSectionComplete();
+        }
       }
     };
     
     utterance.onerror = (e) => {
       console.error("Speech error:", e);
       const nextIndex = index + 1;
-      if (nextIndex < currentSection.content.length) {
+      if (nextIndex < currentSection.content.length && continuousPlay) {
         setCurrentBlockIndex(nextIndex);
         setTimeout(() => speakBlock(nextIndex), 100);
       } else {
@@ -218,7 +376,7 @@ function App() {
     
     const progressPercent = ((index + 1) / currentSection.content.length) * 100;
     setProgress(progressPercent);
-  }, [currentSection, selectedVoice, speed, getBlockText]);
+  }, [currentSection, selectedVoice, speed, getBlockText, continuousPlay]);
 
   // Mark section as complete
   const markSectionComplete = async () => {
@@ -236,17 +394,14 @@ function App() {
     }
   };
 
-  // Play/Pause toggle
+  // Play/Pause toggle for continuous play
   const togglePlay = () => {
     if (isPlaying) {
-      synthRef.current.pause();
+      synthRef.current.cancel();
       setIsPlaying(false);
     } else {
-      if (synthRef.current.paused) {
-        synthRef.current.resume();
-      } else {
-        speakBlock(currentBlockIndex);
-      }
+      setContinuousPlay(true);
+      speakBlock(currentBlockIndex);
       setIsPlaying(true);
     }
   };
@@ -257,6 +412,12 @@ function App() {
     setIsPlaying(false);
     setCurrentBlockIndex(0);
     setProgress(0);
+  };
+
+  // Handle block click - play single block
+  const handleBlockClick = (index) => {
+    setContinuousPlay(false);
+    speakSingleBlock(index);
   };
 
   // Change section
@@ -300,7 +461,6 @@ function App() {
   const getShortVoiceName = (voice) => {
     if (!voice) return "Voix système";
     const name = voice.name;
-    // Extract meaningful part of voice name
     if (name.includes("Google")) return name.replace("Google ", "");
     if (name.includes("Microsoft")) return name.split(" ").slice(1, 3).join(" ");
     return name.split(' ').slice(0, 2).join(' ');
@@ -309,22 +469,20 @@ function App() {
   // Render content block
   const renderBlock = (block, index) => {
     const isActive = index === currentBlockIndex && isPlaying;
-    const isPast = index < currentBlockIndex;
+    const isCurrent = index === currentBlockIndex;
     const blockClass = `content-block content-${block.type}`;
     
     return (
       <div
         key={index}
         data-testid={`content-block-${index}`}
-        className={`${blockClass} ${isActive ? 'speech-highlight' : ''} ${isPast ? 'block-past' : ''}`}
-        onClick={() => {
-          setCurrentBlockIndex(index);
-          if (isPlaying) {
-            speakBlock(index);
-          }
-        }}
-        style={{ cursor: 'pointer' }}
+        className={`${blockClass} ${isActive ? 'speech-highlight' : ''} ${isCurrent && !isPlaying ? 'block-current' : ''}`}
+        onClick={() => handleBlockClick(index)}
+        title="Cliquez pour écouter ce bloc"
       >
+        <div className="block-play-indicator">
+          <Volume1 size={16} />
+        </div>
         {block.title && <h3 className="block-title">{block.title}</h3>}
         {block.question && <p className="qa-question">{block.question}</p>}
         {block.answer && <p className="qa-answer">{block.answer}</p>}
@@ -403,6 +561,7 @@ function App() {
                 <h2 className="section-title" data-testid="section-title">
                   {currentSection.title}
                 </h2>
+                <p className="section-hint">Cliquez sur un bloc pour l'écouter</p>
               </div>
               
               <div data-testid="content-blocks">
@@ -445,7 +604,8 @@ function App() {
             variant={isPlaying ? "default" : "outline"}
             onClick={togglePlay}
             data-testid="play-pause-btn"
-            aria-label={isPlaying ? "Pause" : "Play"}
+            aria-label={isPlaying ? "Pause" : "Lecture continue"}
+            title={isPlaying ? "Arrêter" : "Lecture continue depuis ce bloc"}
             className="h-12 w-12 play-btn"
           >
             {isPlaying ? <Pause size={24} /> : <Play size={24} />}
@@ -456,6 +616,7 @@ function App() {
             onClick={stopPlayback}
             data-testid="stop-btn"
             aria-label="Stop"
+            title="Arrêter et revenir au début"
             className="h-10 w-10"
           >
             <Square size={18} />
