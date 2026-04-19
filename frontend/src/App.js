@@ -154,6 +154,16 @@ function App() {
     synthRef.current.speak(utterance);
   }, [currentSection, selectedVoice, speed, getBlockText]);
 
+  // Mark section complete
+  const markSectionComplete = useCallback(() => {
+    if (!currentSection) return;
+    const newCompleted = new Set([...completedSections, currentSection.id]);
+    setCompletedSections(newCompleted);
+    const progressData = {};
+    newCompleted.forEach(id => progressData[id] = true);
+    saveProgressToStorage(progressData);
+  }, [currentSection, completedSections]);
+
   // Speak with continuous play
   const speakBlock = useCallback((index) => {
     if (!currentSection?.content[index]) return;
@@ -194,17 +204,7 @@ function App() {
     
     synthRef.current.speak(utterance);
     setProgress(((index + 1) / currentSection.content.length) * 100);
-  }, [currentSection, selectedVoice, speed, getBlockText, continuousPlay]);
-
-  // Mark section complete
-  const markSectionComplete = () => {
-    if (!currentSection) return;
-    const newCompleted = new Set([...completedSections, currentSection.id]);
-    setCompletedSections(newCompleted);
-    const progress = {};
-    newCompleted.forEach(id => progress[id] = true);
-    saveProgressToStorage(progress);
-  };
+  }, [currentSection, selectedVoice, speed, getBlockText, continuousPlay, markSectionComplete]);
 
   const togglePlay = () => {
     if (isPlaying) {
