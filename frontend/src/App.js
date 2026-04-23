@@ -416,7 +416,7 @@ export default function App() {
               boxShadow: "0 2px 8px rgba(237,125,49,0.35)",
             }}
           >
-            📝 Entraînement QCM
+            📝 Entraînement Dossier Projet : QCM
           </button>
         </div>
         <ScrollArea className="sidebar-nav">
