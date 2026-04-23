@@ -11,7 +11,7 @@ const loadJSON = (k, fallback) => {
 };
 const saveJSON = (k, v) => { try { localStorage.setItem(k, JSON.stringify(v)); } catch { /* ignore */ } };
 
-export default function QuizPage() {
+export default function QuizPage({ onBack }) {
   const [tab, setTab] = useState("qcm"); // "qcm" | "jury" | "results"
   const [answers, setAnswers] = useState(() => loadJSON(STORAGE_KEY_QCM, {}));   // { "0": {chosen: 1, correct: true}, ... }
   const [revealed, setRevealed] = useState(() => loadJSON(STORAGE_KEY_JURY, {})); // { "0": true, ... }
@@ -53,8 +53,29 @@ export default function QuizPage() {
               <span style={S.h1Sub}>TopGainersCrypto — Romain RECULIN</span>
             </div>
           </div>
-          <div style={S.scoreBadge}>
-            Score : <span style={{ color: "#FFC000" }}>{totals.totalCorrect}/{totals.totalAnswered}</span>
+          <div style={{ display: "flex", alignItems: "center", gap: "0.6rem" }}>
+            <div style={S.scoreBadge}>
+              Score : <span style={{ color: "#FFC000" }}>{totals.totalCorrect}/{totals.totalAnswered}</span>
+            </div>
+            {onBack && (
+              <button
+                onClick={onBack}
+                data-testid="back-to-audio-btn"
+                title="Retour au mode audio"
+                style={{
+                  background: "rgba(255,255,255,0.15)",
+                  color: "white",
+                  border: "1px solid rgba(255,255,255,0.35)",
+                  padding: "0.35rem 0.8rem",
+                  borderRadius: 20,
+                  cursor: "pointer",
+                  fontSize: "0.78rem",
+                  fontWeight: 700,
+                }}
+              >
+                🎧 Mode audio
+              </button>
+            )}
           </div>
         </div>
         <div style={S.progressBar}>

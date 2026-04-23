@@ -375,6 +375,10 @@ export default function App() {
   const completionPct    = Math.round((completedSections.size / course.length) * 100);
 
   // ── JSX ────────────────────────────────────────────────────────────────────
+  if (mode === "quiz") {
+    return <QuizPage onBack={() => setMode("audio")} />;
+  }
+
   return (
     <div className="app-container" data-testid="app-container">
       <button className="mobile-menu-btn" onClick={() => setSidebarOpen(!sidebarOpen)} aria-label="Menu">
@@ -391,6 +395,29 @@ export default function App() {
             </div>
             <span className="progress-text">{completionPct}% complété</span>
           </div>
+          <button
+            onClick={() => { setMode("quiz"); setSidebarOpen(false); }}
+            data-testid="open-quiz-btn"
+            style={{
+              marginTop: "0.85rem",
+              width: "100%",
+              padding: "0.6rem 0.9rem",
+              background: "#ED7D31",
+              color: "white",
+              border: "none",
+              borderRadius: 8,
+              cursor: "pointer",
+              fontSize: "0.85rem",
+              fontWeight: 700,
+              display: "flex",
+              alignItems: "center",
+              justifyContent: "center",
+              gap: "0.5rem",
+              boxShadow: "0 2px 8px rgba(237,125,49,0.35)",
+            }}
+          >
+            📝 Entraînement QCM
+          </button>
         </div>
         <ScrollArea className="sidebar-nav">
           <nav>
