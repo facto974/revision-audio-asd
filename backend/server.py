@@ -105,6 +105,9 @@ SPELL_OUT = {
     "vm": "V-M", "url": "U-R-L", "api": "A-P-I",
     "sli": "S-L-I", "slo": "S-L-O", "sla": "S-L-A",
     "tty": "T-T-Y", "kvm": "K-V-M",
+    # Ajouts pour TopGainersCrypto
+    "sqlite": "S-Q-Lite", "ci/cd": "C-I C-D", "tts": "T-T-S",
+    "promql": "PromQL", "qcm": "Q-C-M",
 }
 
 TECH_SYMBOLS = {
@@ -224,6 +227,33 @@ def generate_audio_for_item(engine: pyttsx3.Engine, item: dict) -> bytes:
     elif item_type == "qa":
         spoken = f"Question du jury. {item.get('question', '')}. Réponse. {item.get('answer', '')}."
         return _render_tts(engine, spoken, rate=145)
+    # ── NOUVEAU : QCM avec question, options et explication ──────────────────
+    elif item_type == "qcm":
+        question = item.get("question", "")
+        options = item.get("options", [])
+        correct_idx = item.get("correct", 0)
+        explanation = item.get("explanation", "")
+        opts_spoken = ". ".join(
+            f"Option {chr(65 + i)}: {opt}" for i, opt in enumerate(options)
+        )
+        correct_letter = chr(65 + correct_idx)
+        spoken = (
+            f"Question à choix multiples. {question}. "
+            f"Les options sont: {opts_spoken}. "
+            f"La bonne réponse est l'option {correct_letter}. "
+            f"Explication: {explanation}."
+        )
+        return _render_tts(engine, spoken, rate=142)
+    # ── NOUVEAU : Question de jury ouverte (titre + réponse modèle) ──────────
+    elif item_type == "jury_open":
+        title = item.get("title", "")
+        model_answer = item.get("model_answer", "")
+        spoken = (
+            f"Question de jury. {title}. "
+            f"Réponse modèle : {model_answer}."
+        )
+        return _render_tts(engine, spoken, rate=145)
+    # ── FIN NOUVEAUX TYPES ───────────────────────────────────────────────────
     elif item_type == "jury":
         spoken = f"Attention, question piège du jury. {item.get('title', '')}. {text}"
         return _render_tts(engine, spoken, rate=148)
@@ -483,6 +513,519 @@ COURSE_CONTENT = [
             {"type": "conclusion", "title": "Message final", "text": "Rappelle-toi : le jury évalue ta compréhension, pas ta mémoire. Tu as les projets, tu as la logique, tu as la méthode. Explique avec tes propres mots pourquoi tu as fait chaque choix. Bonne chance pour ton titre pro ASD, Romain !"},
         ],
     },
+
+    # ══════════════════════════════════════════════════════════════════════════
+    # SECTION PROJET : QCM TOPGAINERSCRYPTO — ENTRAÎNEMENT THÉORIQUE & PRATIQUE
+    # Ajoutée pour la soutenance Executive Bachelor ASD de Romain RECULIN
+    # ══════════════════════════════════════════════════════════════════════════
+    {
+        "id": "topgainers_qcm",
+        "title": "Projet : QCM TopGainersCrypto",
+        "icon": "ClipboardCheck",
+        "content": [
+            {
+                "type": "intro",
+                "text": (
+                    "Entraînement QCM spécifique au projet TopGainersCrypto. "
+                    "20 questions théoriques et pratiques couvrant toutes les compétences évaluées : "
+                    "Python, Streamlit, SQLite, Docker, CI/CD GitHub Actions, Prometheus et sécurité. "
+                    "Chaque question est suivie de la bonne réponse et d'une explication détaillée."
+                ),
+            },
+            # ── SECTION 01 — Contexte & Projet ──────────────────────────────
+            {
+                "type": "qcm",
+                "section": "Contexte & Projet",
+                "question": "Quelle est la principale source de données de l'application TopGainersCrypto ?",
+                "options": ["Binance API", "CoinGecko API", "CoinMarketCap API", "Yahoo Finance"],
+                "correct": 1,
+                "explanation": (
+                    "L'application utilise l'API CoinGecko dans sa version gratuite, limitée à "
+                    "environ 10 à 30 appels par minute. CoinGecko fournit les prix et variations "
+                    "des crypto-monnaies en temps réel via des appels HTTP JSON."
+                ),
+            },
+            {
+                "type": "qcm",
+                "section": "Contexte & Projet",
+                "question": "Combien de crypto-monnaies sont affichées par défaut dans le tableau de bord ?",
+                "options": ["5", "10", "20", "50"],
+                "correct": 1,
+                "explanation": (
+                    "L'application affiche le Top 10 des crypto-monnaies avec la plus forte "
+                    "progression sur 24 heures, avec leur prix et leur variation en pourcentage."
+                ),
+            },
+            {
+                "type": "qcm",
+                "section": "Contexte & Projet",
+                "question": "Quelle fonctionnalité a été abandonnée en cours de développement car jugée dispensable ?",
+                "options": ["L'export CSV", "La mise à jour automatique", "La recherche par nom", "L'historique des données"],
+                "correct": 2,
+                "explanation": (
+                    "La recherche par crypto-monnaie était prévue mais a été retirée. "
+                    "L'export CSV, la mise à jour automatique toutes les 5 minutes et "
+                    "l'historique SQLite ont tous été conservés et livrés."
+                ),
+            },
+            # ── SECTION 02 — Architecture ────────────────────────────────────
+            {
+                "type": "qcm",
+                "section": "Architecture technique",
+                "question": "Quel est le rôle de SQLite dans ce projet ?",
+                "options": [
+                    "Remplacer entièrement l'API CoinGecko",
+                    "Stocker l'historique et servir de fallback si l'API est indisponible",
+                    "Gérer l'authentification des utilisateurs",
+                    "Stocker les images des crypto-monnaies",
+                ],
+                "correct": 1,
+                "explanation": (
+                    "SQLite joue deux rôles : premièrement stocker l'historique des données "
+                    "récupérées avec horodatage, deuxièmement servir de fallback — si l'API "
+                    "CoinGecko est indisponible, l'app affiche les dernières données connues "
+                    "en base plutôt que de planter."
+                ),
+            },
+            {
+                "type": "qcm",
+                "section": "Architecture technique",
+                "question": "Quelle version de Python est utilisée dans ce projet ?",
+                "options": ["Python 2.7", "Python 3.6", "Python 3.9", "Python 3.12"],
+                "correct": 2,
+                "explanation": (
+                    "Python 3.9 est utilisé, correspondant à l'image Docker de base "
+                    "python:3.9-slim. Cette version est stable et compatible avec toutes "
+                    "les dépendances utilisées : Streamlit, prometheus_client, SQLite."
+                ),
+            },
+            {
+                "type": "qcm",
+                "section": "Architecture technique",
+                "question": "Quel est le rôle du fichier logging_conf.py ?",
+                "options": [
+                    "Configurer uniquement les logs applicatifs",
+                    "Configurer Docker Compose",
+                    "Configurer les logs ET les métriques Prometheus",
+                    "Gérer la connexion à l'API CoinGecko",
+                ],
+                "correct": 2,
+                "explanation": (
+                    "logging_conf.py gère à la fois la configuration des logs applicatifs "
+                    "pour détecter les erreurs, et l'exposition des métriques Prometheus "
+                    "via prometheus_client sur le port 8000."
+                ),
+            },
+            # ── SECTION 03 — Docker ──────────────────────────────────────────
+            {
+                "type": "qcm",
+                "section": "Conteneurisation Docker",
+                "question": "Quelle image Docker de base est utilisée et pourquoi 'slim' ?",
+                "options": [
+                    "ubuntu:latest — pour avoir tous les outils système",
+                    "python:3.9-slim — pour réduire la taille et les failles potentielles",
+                    "alpine:3.9 — pour la compatibilité maximale",
+                    "debian:buster — pour la stabilité",
+                ],
+                "correct": 1,
+                "explanation": (
+                    "python:3.9-slim est choisie pour minimiser la taille de l'image Docker. "
+                    "L'image slim supprime les outils de développement et fichiers non "
+                    "nécessaires à l'exécution, réduisant aussi la surface d'attaque."
+                ),
+            },
+            {
+                "type": "qcm",
+                "section": "Conteneurisation Docker",
+                "question": "Pourquoi crée-t-on un utilisateur 'appuser' non-root dans le Dockerfile ?",
+                "options": [
+                    "Pour accélérer le démarrage du conteneur",
+                    "Par convention Docker, sans impact réel sur la sécurité",
+                    "Principe du moindre privilège — limiter les droits en cas de compromission",
+                    "Pour permettre l'accès SSH au conteneur",
+                ],
+                "correct": 2,
+                "explanation": (
+                    "Principe du moindre privilège : si l'application est compromise, "
+                    "l'attaquant ne dispose que des droits de appuser, pas de root. "
+                    "Créé via adduser --disabled-password --gecos apostrophe apostrophe appuser."
+                ),
+            },
+            {
+                "type": "qcm",
+                "section": "Conteneurisation Docker",
+                "question": "Quel port expose quoi dans ce projet Docker ?",
+                "options": [
+                    "8501 Prometheus, 9090 Streamlit, 8000 Métriques",
+                    "8501 Streamlit, 8000 Métriques Prometheus, 9090 Interface Prometheus",
+                    "80 Streamlit, 443 Prometheus, 22 SSH",
+                    "3000 Streamlit, 9090 Prometheus, 8080 API",
+                ],
+                "correct": 1,
+                "explanation": (
+                    "Trois ports : 8501 pour l'interface Streamlit accessible dans le "
+                    "navigateur, 8000 pour les métriques brutes exposées par prometheus_client, "
+                    "9090 pour l'interface graphique de Prometheus avec PromQL."
+                ),
+            },
+            {
+                "type": "qcm",
+                "section": "Conteneurisation Docker",
+                "question": "Que fait la directive 'restart: unless-stopped' dans docker-compose.yml ?",
+                "options": [
+                    "Redémarre le conteneur uniquement au démarrage du système",
+                    "Redémarre automatiquement si crash, sauf si arrêt manuel",
+                    "Empêche tout redémarrage automatique",
+                    "Redémarre le conteneur toutes les heures",
+                ],
+                "correct": 1,
+                "explanation": (
+                    "restart: unless-stopped signifie : redémarre automatiquement si le "
+                    "conteneur s'arrête de façon inattendue, mais ne redémarre pas si "
+                    "l'arrêt a été fait manuellement avec docker stop. "
+                    "Garantit la disponibilité de l'application."
+                ),
+            },
+            {
+                "type": "qcm",
+                "section": "Conteneurisation Docker",
+                "question": "Pourquoi utilise-t-on un volume Docker pour /app/data ?",
+                "options": [
+                    "Pour accélérer les requêtes SQLite",
+                    "Parce que SQLite ne fonctionne pas dans un conteneur",
+                    "Pour que les données persistent après redémarrage ou recréation du conteneur",
+                    "Pour partager la base entre plusieurs conteneurs simultanément",
+                ],
+                "correct": 2,
+                "explanation": (
+                    "Sans volume, la base SQLite est dans le conteneur et perdue à chaque "
+                    "docker-compose down. Avec le volume ./data:/app/data, les données sont "
+                    "sur l'hôte et survivent aux redémarrages et reconstructions d'image."
+                ),
+            },
+            # ── SECTION 04 — CI/CD ───────────────────────────────────────────
+            {
+                "type": "qcm",
+                "section": "CI/CD GitHub Actions",
+                "question": "Combien de tests unitaires ont été écrits et quel est leur résultat ?",
+                "options": [
+                    "5 tests, 2 échecs",
+                    "11 tests, 100% de réussite",
+                    "7 tests, 100% de réussite",
+                    "15 tests, 3 ignorés",
+                ],
+                "correct": 1,
+                "explanation": (
+                    "11 tests au total : 4 dans test_top_movers.py testant succès API, "
+                    "échec, réponse vide et erreur réseau, et 7 dans test_database.py "
+                    "testant création table, idempotence, structure et insertions. "
+                    "Tous passent : 0 erreur, 0 échec."
+                ),
+            },
+            {
+                "type": "qcm",
+                "section": "CI/CD GitHub Actions",
+                "question": "Qu'est-ce que le 'mocking' dans le contexte des tests ?",
+                "options": [
+                    "Simuler de fausses données crypto pour l'interface",
+                    "Remplacer l'appel réel à l'API CoinGecko par une réponse simulée",
+                    "Créer une base de données temporaire pour les tests",
+                    "Vérifier manuellement les résultats des tests",
+                ],
+                "correct": 1,
+                "explanation": (
+                    "Le mocking simule l'API CoinGecko sans faire de vrai appel réseau. "
+                    "On contrôle exactement ce que renvoie l'API pour tester tous les cas "
+                    "de façon rapide et déterministe : succès, erreur, réponse vide, timeout."
+                ),
+            },
+            {
+                "type": "qcm",
+                "section": "CI/CD GitHub Actions",
+                "question": "Quelle est la différence entre CI et CD ?",
+                "options": [
+                    "CI tests manuels, CD tests automatiques",
+                    "CI intégration continue avec tests auto à chaque push, CD déploiement continu si CI passe",
+                    "CI Docker, CD GitHub Actions",
+                    "Aucune différence, c'est le même concept",
+                ],
+                "correct": 1,
+                "explanation": (
+                    "CI, Continuous Integration : à chaque push, les tests se lancent "
+                    "automatiquement. Si un test échoue, on est immédiatement alerté. "
+                    "CD, Continuous Deployment : si la CI passe, le build Docker et le "
+                    "déploiement se font automatiquement sans intervention manuelle."
+                ),
+            },
+            # ── SECTION 05 — Prometheus ──────────────────────────────────────
+            {
+                "type": "qcm",
+                "section": "Monitoring Prometheus",
+                "question": "Comment Prometheus collecte-t-il les métriques de l'application ?",
+                "options": [
+                    "Mode PUSH — l'application envoie les métriques à Prometheus toutes les minutes",
+                    "Mode PULL — Prometheus vient chercher les métriques sur l'endpoint :8000/metrics",
+                    "Mode PUSH — Prometheus envoie des requêtes à l'application",
+                    "Les deux modes simultanément",
+                ],
+                "correct": 1,
+                "explanation": (
+                    "Prometheus fonctionne en mode PULL ou scrape : c'est lui qui interroge "
+                    "l'endpoint /metrics de l'application à intervalles réguliers, toutes les "
+                    "10 secondes dans ce projet. L'application n'envoie rien, elle expose."
+                ),
+            },
+            {
+                "type": "qcm",
+                "section": "Monitoring Prometheus",
+                "question": "Sur quelle URL peut-on consulter les métriques brutes de l'application ?",
+                "options": [
+                    "http://localhost:8501/metrics",
+                    "http://localhost:9090/metrics",
+                    "http://localhost:8000/metrics",
+                    "http://localhost:3000/metrics",
+                ],
+                "correct": 2,
+                "explanation": (
+                    "Les métriques brutes sont exposées par prometheus_client sur le port 8000. "
+                    "Le port 9090 est l'interface Prometheus elle-même. "
+                    "Le port 8501 est Streamlit. Le port 3000 serait Grafana."
+                ),
+            },
+            # ── SECTION 06 — Compétences ─────────────────────────────────────
+            {
+                "type": "qcm",
+                "section": "Compétences du titre",
+                "question": "Parmi ces éléments, lequel n'est PAS utilisé dans le projet TopGainersCrypto ?",
+                "options": ["Kubernetes", "Docker Compose", "GitHub Actions", "Prometheus"],
+                "correct": 0,
+                "explanation": (
+                    "Kubernetes n'est pas utilisé dans ce projet. C'est d'ailleurs cité "
+                    "comme piste d'amélioration future. Le projet utilise Docker Compose "
+                    "pour l'orchestration, GitHub Actions pour le CI/CD et Prometheus "
+                    "pour le monitoring."
+                ),
+            },
+            {
+                "type": "qcm",
+                "section": "Compétences du titre",
+                "question": "Comment l'application garantit-elle de ne pas stocker de clés API dans le code source ?",
+                "options": [
+                    "Les clés sont chiffrées dans le code",
+                    "Il n'y a pas de clé API nécessaire",
+                    "Variables d'environnement dans un fichier .env listé dans .gitignore",
+                    "Les clés sont stockées dans la base SQLite",
+                ],
+                "correct": 2,
+                "explanation": (
+                    "Bonne pratique de sécurité : les clés API sont dans un fichier .env "
+                    "via variables d'environnement, jamais dans le code source. "
+                    "Le .gitignore exclut ce fichier des commits. "
+                    "Ne jamais committer de secrets sur un dépôt public."
+                ),
+            },
+            {
+                "type": "qcm",
+                "section": "Compétences du titre",
+                "question": "Quelle plateforme cloud héberge l'interface Streamlit publiquement ?",
+                "options": [
+                    "AWS Elastic Beanstalk",
+                    "Google Cloud Run",
+                    "Streamlit Community Cloud",
+                    "Heroku",
+                ],
+                "correct": 2,
+                "explanation": (
+                    "Streamlit Community Cloud permet de déployer gratuitement une app "
+                    "Streamlit depuis un repo GitHub public. Docker est utilisé en local "
+                    "pour le développement et le monitoring Prometheus."
+                ),
+            },
+            {
+                "type": "qcm",
+                "section": "Compétences du titre",
+                "question": "Quelle commande permet d'accéder à un conteneur sans ouvrir de port SSH ?",
+                "options": [
+                    "docker ssh <conteneur>",
+                    "docker attach <conteneur>",
+                    "docker exec -it <conteneur> bash",
+                    "docker connect <conteneur>",
+                ],
+                "correct": 2,
+                "explanation": (
+                    "docker exec -it <conteneur> bash ouvre un shell interactif dans le "
+                    "conteneur sans serveur SSH. C'est la méthode recommandée. "
+                    "SSH n'est utile que pour accéder à une machine hôte distante, "
+                    "pas à un conteneur local."
+                ),
+            },
+        ],
+    },
+
+    # ══════════════════════════════════════════════════════════════════════════
+    # SECTION PROJET : QUESTIONS DE JURY OUVERTES — TOPGAINERSCRYPTO
+    # ══════════════════════════════════════════════════════════════════════════
+    {
+        "id": "topgainers_jury",
+        "title": "Projet : Questions de Jury",
+        "icon": "Mic",
+        "content": [
+            {
+                "type": "intro",
+                "text": (
+                    "12 questions ouvertes types que le jury ASD pose systématiquement "
+                    "sur le projet TopGainersCrypto. Pour chaque question, écoute la "
+                    "réponse modèle et entraîne-toi à la reformuler avec tes propres mots. "
+                    "Le jury évalue ta compréhension, pas ta mémoire."
+                ),
+            },
+            {
+                "type": "jury_open",
+                "title": "Pourquoi avoir choisi SQLite plutôt que PostgreSQL ou MySQL ?",
+                "model_answer": (
+                    "SQLite est adapté à ce projet pour plusieurs raisons : il ne nécessite "
+                    "pas de serveur dédié, son fichier s'intègre naturellement dans un volume "
+                    "Docker, et le projet n'a pas besoin de concurrence élevée ni de "
+                    "multi-utilisateurs. C'est un choix pragmatique cohérent avec la taille "
+                    "du projet. J'ai identifié PostgreSQL comme piste d'amélioration si le "
+                    "projet devait passer à l'échelle."
+                ),
+            },
+            {
+                "type": "jury_open",
+                "title": "Comment fonctionne le fallback quand l'API CoinGecko est indisponible ?",
+                "model_answer": (
+                    "Quand l'appel à l'API échoue, timeout ou rate limit, le code Python dans "
+                    "top_movers.py intercepte l'exception, logue l'erreur, et requête la base "
+                    "SQLite pour récupérer les dernières données enregistrées. Streamlit "
+                    "affiche ces données avec un message indiquant qu'il s'agit du cache. "
+                    "L'application reste accessible et ne plante pas."
+                ),
+            },
+            {
+                "type": "jury_open",
+                "title": "Quelle est la différence entre une image Docker et un conteneur ?",
+                "model_answer": (
+                    "Une image Docker est un modèle figé et immuable, c'est la recette. "
+                    "Un conteneur est une instance en cours d'exécution de cette image. "
+                    "On peut créer plusieurs conteneurs identiques depuis la même image. "
+                    "Dans ce projet : le Dockerfile définit l'image, "
+                    "docker-compose up crée les conteneurs."
+                ),
+            },
+            {
+                "type": "jury_open",
+                "title": "Si un test unitaire échoue dans votre pipeline, que se passe-t-il ?",
+                "model_answer": (
+                    "GitHub Actions bloque le workflow à l'étape des tests. "
+                    "Le build Docker et le déploiement ne se déclenchent pas. "
+                    "Une notification est envoyée. C'est l'intérêt du CI : empêcher "
+                    "une régression d'atteindre la production. Sur mon projet, "
+                    "tous les tests passent à chaque push, garantissant que le code "
+                    "est dans un état déployable."
+                ),
+            },
+            {
+                "type": "jury_open",
+                "title": "Pouvez-vous expliquer la ligne COPY requirements.txt . dans le Dockerfile ?",
+                "model_answer": (
+                    "Cette ligne copie requirements.txt de la machine hôte vers le répertoire "
+                    "de travail dans le conteneur. On le copie AVANT le code source pour "
+                    "profiter du cache Docker : si requirements.txt n'a pas changé, "
+                    "Docker réutilise la couche d'installation des dépendances sans tout "
+                    "réinstaller, ce qui accélère les builds."
+                ),
+            },
+            {
+                "type": "jury_open",
+                "title": "Qu'est-ce que PromQL et pouvez-vous donner un exemple concret ?",
+                "model_answer": (
+                    "PromQL est le langage de requête de Prometheus pour analyser les métriques. "
+                    "Exemple concret : rate de api_calls_total avec status error sur 5 minutes "
+                    "calcule le taux d'erreurs API sur les 5 dernières minutes. "
+                    "Autre exemple : rate de api_response_seconds_sum sur rate de "
+                    "api_response_seconds_count donne le temps de réponse moyen."
+                ),
+            },
+            {
+                "type": "jury_open",
+                "title": "Qu'avez-vous appris de ce projet que vous n'auriez pas appris autrement ?",
+                "model_answer": (
+                    "Plusieurs choses concrètes. Premièrement Docker m'a appris que "
+                    "ça marche sur ma machine n'est pas une réponse. "
+                    "Deuxièmement tester son code force à mieux le structurer. "
+                    "Troisièmement surveiller une application c'est mesurer son comportement, "
+                    "pas attendre la panne. Quatrièmement construire quelque chose de "
+                    "fonctionnel en Python depuis presque zéro donne confiance pour "
+                    "apprendre d'autres technologies."
+                ),
+            },
+            {
+                "type": "jury_open",
+                "title": "Comment géreriez-vous une montée en charge si 1000 utilisateurs consultaient l'app ?",
+                "model_answer": (
+                    "Dans l'état actuel l'architecture ne supporte pas 1000 utilisateurs. "
+                    "Les pistes d'évolution identifiées sont : passer à Kubernetes pour "
+                    "la scalabilité horizontale, remplacer SQLite par PostgreSQL pour "
+                    "la concurrence, ajouter un cache Redis pour limiter les appels API, "
+                    "et mettre en place un load balancer devant plusieurs instances Streamlit."
+                ),
+            },
+            {
+                "type": "jury_open",
+                "title": "Pourquoi avoir choisi Streamlit plutôt que Flask ou FastAPI ?",
+                "model_answer": (
+                    "Streamlit permet de créer une interface web en Python pur, sans HTML, "
+                    "CSS ou JavaScript. Comme j'apprenais Python en même temps que DevOps, "
+                    "c'était cohérent avec mon niveau et les objectifs du projet. "
+                    "Flask ou FastAPI auraient nécessité du développement front-end. "
+                    "Streamlit a aussi l'avantage de son Community Cloud pour un "
+                    "déploiement rapide et gratuit."
+                ),
+            },
+            {
+                "type": "jury_open",
+                "title": "Qu'est-ce que le principe du moindre privilège et comment l'avez-vous appliqué ?",
+                "model_answer": (
+                    "Le principe du moindre privilège signifie que chaque composant ne doit "
+                    "avoir accès qu'à ce qui lui est strictement nécessaire. Dans ce projet : "
+                    "l'utilisateur appuser dans Docker n'a pas les droits root, les clés API "
+                    "sont en variables d'environnement jamais dans le code, et le gitignore "
+                    "protège les fichiers sensibles. Ce principe m'était déjà familier "
+                    "dans mon contexte support IT pour la gestion des droits utilisateurs."
+                ),
+            },
+            {
+                "type": "jury_open",
+                "title": "En quoi ce projet couvre-t-il toutes les compétences du titre ASD ?",
+                "model_answer": (
+                    "Chacune des 10 compétences est adressée : automatisation serveur via "
+                    "setup-app-server.sh, déploiement automatisé via Docker et CI/CD, "
+                    "sécurisation via variables d'environnement et utilisateur non-root, "
+                    "mise en production cloud via Streamlit Community Cloud, "
+                    "environnement de test via pytest avec 11 tests, "
+                    "stockage données via SQLite et volumes Docker, "
+                    "gestion conteneurs via Docker Compose, "
+                    "automatisation mise en prod via GitHub Actions, "
+                    "statistiques services via 4 métriques Prometheus, "
+                    "et supervision via l'interface Prometheus avec PromQL."
+                ),
+            },
+            {
+                "type": "jury_open",
+                "title": "Quels sont les points faibles ou les limites de votre projet ?",
+                "model_answer": (
+                    "Honnêteté importante ici. Prometheus n'a pas été exploité à son plein "
+                    "potentiel : pas de dashboards Grafana ni d'alertes configurées. "
+                    "L'API CoinGecko gratuite limite les appels et donc la fraîcheur des données. "
+                    "Streamlit n'est pas adapté à une vraie charge de production. "
+                    "Pas de graphiques d'évolution des prix, fonctionnalité prévue non réalisée. "
+                    "Architecture mono-instance non scalable. "
+                    "Ce sont des pistes d'amélioration réalistes et identifiées."
+                ),
+            },
+        ],
+    },
 ]
 
 # ====================== HTML FRONTEND ======================
@@ -611,6 +1154,16 @@ FRONTEND_HTML = """<!DOCTYPE html>
     color: var(--text3);
     padding: 4px 8px 8px;
   }
+  .aside-separator {
+    font-size: 9px;
+    font-weight: 700;
+    text-transform: uppercase;
+    letter-spacing: 0.12em;
+    color: var(--amber);
+    padding: 12px 8px 4px;
+    border-top: 1px solid var(--border);
+    margin-top: 6px;
+  }
   .nav-item {
     display: flex;
     align-items: center;
@@ -628,7 +1181,9 @@ FRONTEND_HTML = """<!DOCTYPE html>
   }
   .nav-item:hover { background: var(--surface2); color: var(--text); }
   .nav-item.active { background: rgba(79,124,255,0.15); color: var(--accent); font-weight: 500; }
-  .nav-item .nav-icon { font-size: 14px; flex-shrink: 0; }
+  .nav-item.project-item { color: #fbbf24; }
+  .nav-item.project-item:hover { background: rgba(245,158,11,0.1); color: var(--amber); }
+  .nav-item.project-item.active { background: rgba(245,158,11,0.15); color: var(--amber); }
   .nav-item .nav-label { flex: 1; line-height: 1.3; }
   .nav-item .progress-dot {
     width: 6px; height: 6px;
@@ -653,7 +1208,6 @@ FRONTEND_HTML = """<!DOCTYPE html>
     padding-bottom: 16px;
     border-bottom: 1px solid var(--border);
   }
-  .section-icon { font-size: 24px; }
   .section-title { font-size: 20px; font-weight: 700; letter-spacing: -0.02em; }
   .section-hint { font-size: 13px; color: var(--text3); margin-top: 2px; }
   .items-list { display: flex; flex-direction: column; gap: 6px; }
@@ -710,6 +1264,9 @@ FRONTEND_HTML = """<!DOCTYPE html>
   .badge-file     { background: rgba(6,182,212,0.12); color: #22d3ee; }
   .badge-qa       { background: rgba(245,158,11,0.15); color: #fbbf24; }
   .badge-conclusion{ background: rgba(34,197,94,0.12); color: #4ade80; }
+  /* Nouveaux badges pour les sections projet */
+  .badge-qcm      { background: rgba(79,124,255,0.2); color: #93c5fd; }
+  .badge-jury-open{ background: rgba(245,158,11,0.2); color: #fcd34d; }
   .item-title { font-size: 14px; font-weight: 600; color: var(--text); margin-bottom: 4px; }
   .item-text  { font-size: 14px; color: var(--text2); line-height: 1.65; }
   /* Code block */
@@ -752,6 +1309,43 @@ FRONTEND_HTML = """<!DOCTYPE html>
     padding-left: 32px;
     border-left: 2px solid rgba(34,197,94,0.3);
     margin-left: 0;
+  }
+  /* QCM block */
+  .qcm-question { font-size: 14px; font-weight: 600; color: var(--text); margin-bottom: 8px; }
+  .qcm-section-tag {
+    font-size: 10px; font-weight: 600;
+    color: #93c5fd; background: rgba(79,124,255,0.12);
+    padding: 1px 6px; border-radius: 3px;
+    margin-bottom: 6px; display: inline-block;
+  }
+  .qcm-options { display: flex; flex-direction: column; gap: 4px; margin-bottom: 8px; }
+  .qcm-option {
+    font-size: 13px; color: var(--text2);
+    padding: 4px 8px; border-radius: 4px;
+    display: flex; align-items: flex-start; gap: 6px;
+  }
+  .qcm-option.correct-opt { color: var(--green); font-weight: 600; }
+  .qcm-option-letter {
+    font-size: 10px; font-weight: 700;
+    min-width: 18px; height: 18px;
+    border-radius: 50%;
+    background: var(--surface2);
+    color: var(--text3);
+    display: flex; align-items: center; justify-content: center;
+    flex-shrink: 0; margin-top: 1px;
+  }
+  .qcm-option.correct-opt .qcm-option-letter { background: rgba(34,197,94,0.2); color: var(--green); }
+  .qcm-explanation {
+    font-size: 13px; color: var(--text3);
+    border-left: 2px solid rgba(79,124,255,0.3);
+    padding-left: 8px; line-height: 1.55;
+  }
+  /* Jury open block */
+  .jury-open-question { font-size: 14px; font-weight: 600; color: #fbbf24; margin-bottom: 8px; }
+  .jury-open-answer {
+    font-size: 13px; color: var(--text2); line-height: 1.65;
+    border-left: 2px solid rgba(245,158,11,0.35);
+    padding-left: 10px;
   }
   /* Play indicator */
   .play-icon {
@@ -856,6 +1450,10 @@ FRONTEND_HTML = """<!DOCTYPE html>
 // ─────────────────────────────────────────────────────────
 const ITEMS_PER_PAGE = __ITEMS_PER_PAGE__;
 const COURSE = __COURSE_JSON__;
+
+// IDs des sections projet (affichage distinct dans la sidebar)
+const PROJECT_SECTION_IDS = ['topgainers_qcm', 'topgainers_jury'];
+
 let currentSectionId = null;
 let currentPage = 1;
 
@@ -867,16 +1465,17 @@ let voices = [];
 let frVoices = [];
 let enVoices = [];
 let currentBlock = null;
-let progress = {};
 
 // ─────────────────────────────────────────────────────────
-// VITESSES PAR TYPE DE CONTENU
+// VITESSES PAR TYPE
 // ─────────────────────────────────────────────────────────
 const RATES = {
   audio_command: 0.75, audio_code: 0.78, audio_file: 0.72,
   audio_code_explain: 0.88, security: 0.88, jury: 0.88, qa: 0.88,
   audio_terminal_tip: 0.90, method: 0.92, technical: 0.90,
   concept: 0.95, intro: 0.98, audio_analogy: 0.95, conclusion: 0.92,
+  // Nouveaux types
+  qcm: 0.90, jury_open: 0.88,
   _default: 0.95,
 };
 
@@ -885,14 +1484,10 @@ const RATES = {
 // ─────────────────────────────────────────────────────────
 function loadVoices() {
   const all = speechSynthesis.getVoices();
-  if (!all.length) {
-    setTimeout(loadVoices, 100);
-    return;
-  }
+  if (!all.length) { setTimeout(loadVoices, 100); return; }
   voices = all;
   frVoices = all.filter(v => v.lang.startsWith('fr'));
   enVoices = all.filter(v => v.lang.startsWith('en'));
-
   const sel = document.getElementById('voice-select');
   sel.innerHTML = '';
   const pool = currentLang === 'fr' ? (frVoices.length ? frVoices : all) : (enVoices.length ? enVoices : all);
@@ -926,32 +1521,24 @@ function speak(item, blockEl) {
   currentBlock = blockEl;
   currentBlock.classList.add('playing');
   document.getElementById('status-dot').classList.add('playing');
-
   const text = buildSpeechText(item);
   const rate = getRate(item.type);
-  setStatus(`Lecture... (×${rate.toFixed(2)})`);
-
+  setStatus('Lecture... (×' + rate.toFixed(2) + ')');
   const utt = new SpeechSynthesisUtterance(text);
   utt.lang = currentLang === 'fr' ? 'fr-FR' : 'en-US';
   utt.rate = rate;
   const voice = getSelectedVoice();
   if (voice) utt.voice = voice;
-
   utt.onend = () => {
-    if (currentBlock) {
-      currentBlock.classList.remove('playing');
-      currentBlock.classList.add('highlighted');
-    }
+    if (currentBlock) { currentBlock.classList.remove('playing'); currentBlock.classList.add('highlighted'); }
     document.getElementById('status-dot').classList.remove('playing');
     setStatus('Lecture terminée. Cliquez pour relire.');
   };
-
   utt.onerror = () => {
     if (currentBlock) currentBlock.classList.remove('playing');
     document.getElementById('status-dot').classList.remove('playing');
     setStatus('Erreur de lecture. Réessayez.');
   };
-
   speechSynthesis.speak(utt);
 }
 
@@ -962,9 +1549,7 @@ function stopAll() {
   setStatus('Arrêté');
 }
 
-function setStatus(msg) {
-  document.getElementById('status-text').textContent = msg;
-}
+function setStatus(msg) { document.getElementById('status-text').textContent = msg; }
 
 // ─────────────────────────────────────────────────────────
 // PAGINATION
@@ -973,39 +1558,33 @@ function paginateContent(content, page) {
   const total_items = content.length;
   const total_pages = Math.ceil(total_items / ITEMS_PER_PAGE);
   const start_idx = (page - 1) * ITEMS_PER_PAGE;
-  const end_idx = start_idx + ITEMS_PER_PAGE;
   return {
-    data: content.slice(start_idx, end_idx),
-    page: page,
-    total_pages: total_pages,
-    total_items: total_items
+    data: content.slice(start_idx, start_idx + ITEMS_PER_PAGE),
+    page, total_pages, total_items
   };
 }
 
 function renderPagination(totalPages, currentPage) {
-  const paginationDiv = document.getElementById('pagination');
-  paginationDiv.innerHTML = '';
-
+  const div = document.getElementById('pagination');
+  div.innerHTML = '';
   if (currentPage > 1) {
-    const prevButton = document.createElement('button');
-    prevButton.textContent = '←';
-    prevButton.addEventListener('click', () => renderSection(currentSectionId, currentPage - 1));
-    paginationDiv.appendChild(prevButton);
+    const b = document.createElement('button');
+    b.textContent = '←';
+    b.addEventListener('click', () => renderSection(currentSectionId, currentPage - 1));
+    div.appendChild(b);
   }
-
   for (let i = 1; i <= totalPages; i++) {
-    const button = document.createElement('button');
-    button.textContent = i;
-    if (i === currentPage) button.classList.add('active');
-    button.addEventListener('click', () => renderSection(currentSectionId, i));
-    paginationDiv.appendChild(button);
+    const b = document.createElement('button');
+    b.textContent = i;
+    if (i === currentPage) b.classList.add('active');
+    b.addEventListener('click', () => renderSection(currentSectionId, i));
+    div.appendChild(b);
   }
-
   if (currentPage < totalPages) {
-    const nextButton = document.createElement('button');
-    nextButton.textContent = '→';
-    nextButton.addEventListener('click', () => renderSection(currentSectionId, currentPage + 1));
-    paginationDiv.appendChild(nextButton);
+    const b = document.createElement('button');
+    b.textContent = '→';
+    b.addEventListener('click', () => renderSection(currentSectionId, currentPage + 1));
+    div.appendChild(b);
   }
 }
 
@@ -1020,13 +1599,62 @@ const TYPE_LABELS = {
   audio_code_explain: ['explication', 'badge-explain'], audio_terminal_tip: ['astuce', 'badge-tip'],
   audio_analogy: ['analogie', 'badge-analogy'], audio_file: ['config', 'badge-file'],
   qa: ['Q&A jury', 'badge-qa'], conclusion: ['conclusion', 'badge-conclusion'],
+  // Nouveaux types
+  qcm: ['QCM', 'badge-qcm'],
+  jury_open: ['🎤 jury ouvert', 'badge-jury-open'],
 };
 
-const SPEED_LABELS = {
-  audio_command: 'lent', audio_code: 'lent', audio_file: 'très lent',
-  audio_code_explain: 'modéré', security: 'modéré', jury: 'modéré',
-  qa: 'modéré', _default: 'normal',
-};
+function renderItemBlock(item) {
+  const div = document.createElement('div');
+  div.className = 'item-block';
+  const [label, badgeClass] = TYPE_LABELS[item.type] || [item.type, 'badge-explain'];
+
+  let bodyHTML = '';
+
+  if (item.type === 'qcm') {
+    // ── Rendu spécial QCM ──────────────────────────────────────────────────
+    const sectionTag = item.section
+      ? `<span class="qcm-section-tag">${escapeHtml(item.section)}</span><br>`
+      : '';
+    const optsHTML = (item.options || []).map((opt, j) => {
+      const isCorrect = j === item.correct;
+      const letter = String.fromCharCode(65 + j);
+      return `<div class="qcm-option${isCorrect ? ' correct-opt' : ''}">
+        <span class="qcm-option-letter">${letter}</span>
+        <span>${escapeHtml(opt)}${isCorrect ? ' ✓' : ''}</span>
+      </div>`;
+    }).join('');
+    const expHTML = item.explanation
+      ? `<div class="qcm-explanation">${escapeHtml(item.explanation)}</div>`
+      : '';
+    bodyHTML = `${sectionTag}<div class="qcm-question">${escapeHtml(item.question || '')}</div><div class="qcm-options">${optsHTML}</div>${expHTML}`;
+
+  } else if (item.type === 'jury_open') {
+    // ── Rendu spécial question de jury ouverte ─────────────────────────────
+    bodyHTML = `
+      <div class="jury-open-question">${escapeHtml(item.title || '')}</div>
+      <div class="jury-open-answer">${escapeHtml(item.model_answer || '')}</div>
+    `;
+
+  } else if (item.type === 'qa') {
+    bodyHTML = `<div class="qa-question"><span class="qa-q-badge">Q</span>${escapeHtml(item.question || '')}</div><div class="qa-answer">${escapeHtml(item.answer || '')}</div>`;
+
+  } else if (['audio_command', 'audio_code', 'audio_file'].includes(item.type)) {
+    bodyHTML = `<pre class="item-code">${escapeHtml(item.text || '')}</pre>`;
+
+  } else {
+    const titleHTML = item.title ? `<div class="item-title">${escapeHtml(item.title)}</div>` : '';
+    bodyHTML = `${titleHTML}<div class="item-text">${escapeHtml(item.text || '')}</div>`;
+  }
+
+  div.innerHTML = `
+    <div class="type-badge ${badgeClass}">${label}</div>
+    ${bodyHTML}
+    <span class="play-icon">▶</span>
+  `;
+  div.addEventListener('click', (e) => { e.stopPropagation(); speak(item, div); });
+  return div;
+}
 
 function renderSection(sectionId, page = 1) {
   speechSynthesis.cancel();
@@ -1035,12 +1663,11 @@ function renderSection(sectionId, page = 1) {
 
   const section = COURSE.find(s => s.id === sectionId);
   if (!section) return;
-
   currentSectionId = sectionId;
   currentPage = page;
 
   document.querySelectorAll('.nav-item').forEach(b => b.classList.remove('active'));
-  const navBtn = document.querySelector(`.nav-item[data-id="${sectionId}"]`);
+  const navBtn = document.querySelector('.nav-item[data-id="' + sectionId + '"]');
   if (navBtn) navBtn.classList.add('active');
 
   document.getElementById('section-header').innerHTML = `
@@ -1053,39 +1680,9 @@ function renderSection(sectionId, page = 1) {
 
   const list = document.getElementById('items-list');
   list.innerHTML = '';
+  paginated.data.forEach(item => list.appendChild(renderItemBlock(item)));
 
-  paginated.data.forEach((item) => {
-    const div = document.createElement('div');
-    div.className = 'item-block';
-    const [label, badgeClass] = TYPE_LABELS[item.type] || [item.type, 'badge-explain'];
-    const speedLabel = SPEED_LABELS[item.type] || SPEED_LABELS._default;
-
-    let bodyHTML = '';
-    if (item.type === 'qa') {
-      bodyHTML = `<div class="qa-question"><span class="qa-q-badge">Q</span>${item.question || ''}</div><div class="qa-answer">${item.answer || ''}</div>`;
-    } else if (['audio_command', 'audio_code', 'audio_file'].includes(item.type)) {
-      bodyHTML = `<pre class="item-code">${escapeHtml(item.text || '')}</pre>`;
-    } else {
-      const titleHTML = item.title ? `<div class="item-title">${escapeHtml(item.title)}</div>` : '';
-      bodyHTML = `${titleHTML}<div class="item-text">${escapeHtml(item.text || '')}</div>`;
-    }
-
-    div.innerHTML = `
-      <div class="type-badge ${badgeClass}">${label}</div>
-      ${bodyHTML}
-      <span class="speed-info">${speedLabel}</span>
-      <span class="play-icon">▶</span>
-    `;
-
-    div.addEventListener('click', (e) => {
-      e.stopPropagation();
-      speak(item, div);
-    });
-
-    list.appendChild(div);
-  });
-
-  setStatus(`${paginated.data.length} blocs — cliquez pour lire`);
+  setStatus(paginated.data.length + ' blocs — cliquez pour lire');
 }
 
 // ─────────────────────────────────────────────────────────
@@ -1093,9 +1690,22 @@ function renderSection(sectionId, page = 1) {
 // ─────────────────────────────────────────────────────────
 function buildNav() {
   const nav = document.getElementById('nav-list');
+  let projectSeparatorAdded = false;
+
   COURSE.forEach(section => {
+    const isProject = PROJECT_SECTION_IDS.includes(section.id);
+
+    // Ajouter le séparateur avant les sections projet
+    if (isProject && !projectSeparatorAdded) {
+      const sep = document.createElement('div');
+      sep.className = 'aside-separator';
+      sep.textContent = '★ Projet — Soutenance';
+      nav.appendChild(sep);
+      projectSeparatorAdded = true;
+    }
+
     const btn = document.createElement('button');
-    btn.className = 'nav-item';
+    btn.className = 'nav-item' + (isProject ? ' project-item' : '');
     btn.dataset.id = section.id;
     btn.innerHTML = `<span class="nav-label">${section.title}</span><span class="progress-dot"></span>`;
     btn.addEventListener('click', () => renderSection(section.id));
@@ -1110,9 +1720,7 @@ buildNav();
 renderSection('intro', 1);
 
 if (typeof speechSynthesis !== 'undefined') {
-  if (speechSynthesis.onvoiceschanged !== undefined) {
-    speechSynthesis.onvoiceschanged = loadVoices;
-  }
+  if (speechSynthesis.onvoiceschanged !== undefined) speechSynthesis.onvoiceschanged = loadVoices;
   setTimeout(loadVoices, 300);
 } else {
   setStatus('⚠ Web Speech API non supportée');
@@ -1122,12 +1730,13 @@ if (typeof speechSynthesis !== 'undefined') {
 // UTILITAIRES
 // ─────────────────────────────────────────────────────────
 function escapeHtml(s) {
-  return s.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
+  return String(s)
+    .replace(/&/g, '&amp;')
+    .replace(/</g, '&lt;')
+    .replace(/>/g, '&gt;');
 }
 
-function getRate(type) {
-  return RATES[type] || RATES._default;
-}
+function getRate(type) { return RATES[type] || RATES._default; }
 
 function buildSpeechText(item) {
   const t = item.type;
@@ -1135,47 +1744,46 @@ function buildSpeechText(item) {
   const title = item.title || '';
   const lang = currentLang;
 
+  // ── Nouveaux types ───────────────────────────────────────────────────────
+  if (t === 'qcm') {
+    const opts = (item.options || []).map((o, i) => `Option ${String.fromCharCode(65+i)}: ${o}`).join('. ');
+    const correctLetter = String.fromCharCode(65 + (item.correct || 0));
+    return lang === 'fr'
+      ? `Question. ${item.question || ''}. ${opts}. Bonne réponse : option ${correctLetter}. Explication : ${item.explanation || ''}.`
+      : `Question. ${item.question || ''}. ${opts}. Correct answer: option ${correctLetter}. Explanation: ${item.explanation || ''}.`;
+  }
+
+  if (t === 'jury_open') {
+    return lang === 'fr'
+      ? `Question de jury. ${title}. Réponse modèle. ${item.model_answer || ''}.`
+      : `Jury question. ${title}. Model answer. ${item.model_answer || ''}.`;
+  }
+  // ── Types existants ──────────────────────────────────────────────────────
+
   const prefixes = {
     fr: {
-      audio_command: 'Commande terminal. ',
-      audio_code: 'Code. ',
-      audio_file: 'Fichier de configuration. ',
-      audio_code_explain: '',
-      audio_terminal_tip: 'Astuce importante. ',
-      audio_analogy: 'Pour mieux comprendre. ',
-      security: 'Point sécurité. ',
-      jury: 'Question piège du jury. ',
-      qa: '',
-      conclusion: 'Pour conclure. ',
-      method: 'Méthode. ',
-      concept: 'Concept clé. ',
-      technical: '',
-      intro: '',
+      audio_command: 'Commande terminal. ', audio_code: 'Code. ',
+      audio_file: 'Fichier de configuration. ', audio_code_explain: '',
+      audio_terminal_tip: 'Astuce importante. ', audio_analogy: 'Pour mieux comprendre. ',
+      security: 'Point sécurité. ', jury: 'Question piège du jury. ', qa: '',
+      conclusion: 'Pour conclure. ', method: 'Méthode. ', concept: 'Concept clé. ',
+      technical: '', intro: '',
     },
     en: {
-      audio_command: 'Terminal command. ',
-      audio_code: 'Code. ',
-      audio_file: 'Configuration file. ',
-      audio_code_explain: '',
-      audio_terminal_tip: 'Important tip. ',
-      audio_analogy: 'To understand better. ',
-      security: 'Security point. ',
-      jury: 'Tricky jury question. ',
-      qa: '',
-      conclusion: 'To conclude. ',
-      method: 'Method. ',
-      concept: 'Key concept. ',
-      technical: '',
-      intro: '',
+      audio_command: 'Terminal command. ', audio_code: 'Code. ',
+      audio_file: 'Configuration file. ', audio_code_explain: '',
+      audio_terminal_tip: 'Important tip. ', audio_analogy: 'To understand better. ',
+      security: 'Security point. ', jury: 'Tricky jury question. ', qa: '',
+      conclusion: 'To conclude. ', method: 'Method. ', concept: 'Key concept. ',
+      technical: '', intro: '',
     },
   };
 
-  const prefix = prefixes[lang][t] || '';
+  const prefix = (prefixes[lang] || prefixes.fr)[t] || '';
   const titlePart = title ? title + '. ' : '';
 
   if (t === 'qa') {
-    const q = item.question || '';
-    const a = item.answer || '';
+    const q = item.question || ''; const a = item.answer || '';
     return lang === 'fr'
       ? `Question du jury. ${q}. Réponse. ${a}.`
       : `Jury question. ${q}. Answer. ${a}.`;
