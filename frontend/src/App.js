@@ -112,6 +112,7 @@ export default function App() {
   const [speed,           setSpeed]           = useState(IS_ANDROID ? 0.9 : 1);
   const [sidebarOpen,     setSidebarOpen]     = useState(false);
   const [progress,        setProgress]        = useState(0);
+  const [mode,            setMode]            = useState("audio");
 
   const synthRef          = useRef(window.speechSynthesis);
   const continuousRef     = useRef(false);
