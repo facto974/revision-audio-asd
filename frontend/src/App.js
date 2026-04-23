@@ -9,6 +9,7 @@ import {
   Brain, Server, Container, Activity, HelpCircle, ChevronRight, ChevronLeft,
   Terminal, Shield, Cloud, GitBranch, Database, Layers, BarChart, Globe, Wrench, Volume1,
 } from "lucide-react";
+import QuizPage from "./components/QuizPage";
 
 const iconMap = {
   Brain, Server, Container, Activity, HelpCircle, Terminal,
