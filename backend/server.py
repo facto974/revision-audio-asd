@@ -532,6 +532,34 @@ COURSE_CONTENT = [
                     "Chaque question est suivie de la bonne réponse et d'une explication détaillée."
                 ),
             },
+            {
+                "type": "project_overview",
+                "title": "Présentation rapide du projet TopGainersCrypto",
+                "text": (
+                    "TopGainersCrypto est une **application web** développée en Python avec **Streamlit**, "
+                    "conçue pour afficher en temps réel les **10 crypto-monnaies les plus performantes sur 24h**. "
+                    "Elle s'appuie sur l'**API CoinGecko** pour récupérer les données de marché, "
+                    "les stocke localement dans une base **SQLite** pour un historique et un fallback, "
+                    "et les affiche via une interface simple et intuitive.\n\n"
+            
+                    "**Architecture technique :**\n"
+                    "- **Frontend/Backend** : Streamlit (Python pur, sans HTML/JS).\n"
+                    "- **Conteneurisation** : Docker (image légère `python:3.9-slim`, utilisateur non-root).\n"
+                    "- **Orchestration** : Docker Compose pour gérer l'application et ses dépendances.\n"
+                    "- **CI/CD** : GitHub Actions (11 tests unitaires + build automatique de l'image Docker).\n"
+                    "- **Monitoring** : Prometheus (métriques exposées sur le port 8000, interface sur le port 9090).\n"
+                    "- **Déploiement** : Streamlit Community Cloud pour la démo publique, Docker en local pour le développement.\n\n"
+            
+                    "**Points clés :**\n"
+                    "- **Mise à jour automatique** toutes les 5 minutes.\n"
+                    "- **Export CSV** des données affichées.\n"
+                    "- **Sécurité** : CIDR /32 pour SSH, secrets gérés via `.env`, audit des dépendances Python.\n"
+                    "- **Évolutions prévues** : Migration vers PostgreSQL, ajout de Kubernetes, renforcement HTTPS.\n\n"
+            
+                    "Ce projet illustre une **stack moderne** pour une application data-driven, "
+                    "avec une attention particulière à la **maintenabilité**, la **sécurité** et l'**automatisation**."
+                )
+            },
             # ── SECTION 01 — Contexte & Projet ──────────────────────────────
             {
                 "type": "qcm",
