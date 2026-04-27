@@ -109,7 +109,7 @@ export default function App() {
   const [currentBlockIndex, setCurrentBlockIndex] = useState(0);
   const [voices,          setVoices]          = useState([]);
   const [selectedVoice,   setSelectedVoice]   = useState(null);
-  const [speed,           setSpeed]           = useState(IS_ANDROID ? 0.9 : 1);
+  const [speed,           setSpeed]           = useState(0.9);
   const [sidebarOpen,     setSidebarOpen]     = useState(false);
   const [progress,        setProgress]        = useState(0);
   const [mode,            setMode]            = useState("audio");
@@ -505,7 +505,7 @@ export default function App() {
           <Select value={speed.toString()} onValueChange={changeSpeed}>
             <SelectTrigger className="speed-select"><SelectValue /></SelectTrigger>
             <SelectContent className="z-[70]">
-              {[0.5, 0.75, 0.9, 1, 1.25, 1.5, 2].map(s =>
+              {[0.5, 0.75, 0.8, 0.9, 1, 1.25, 1.5, 2].map(s =>
                 <SelectItem key={s} value={s.toString()}>{s}x</SelectItem>)}
             </SelectContent>
           </Select>
