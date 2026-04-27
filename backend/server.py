@@ -534,33 +534,25 @@ COURSE_CONTENT = [
             },
             {
                 "type": "concept",
-                "title": "Présentation rapide du projet TopGainersCrypto",
+                "title": "Présentation du projet TopGainersCrypto",
                 "text": (
-                    "TopGainersCrypto est une **application web** développée en Python avec **Streamlit**, "
-                    "conçue pour afficher en temps réel les **10 crypto-monnaies les plus performantes sur 24h**. "
-                    "Elle s'appuie sur l'**API CoinGecko** pour récupérer les données de marché, "
-                    "les stocke localement dans une base **SQLite** pour un historique et un fallback, "
-                    "et les affiche via une interface simple et intuitive.\n\n"
-            
-                    "**Architecture technique :**\n"
-                    "- **Frontend/Backend** : Streamlit (Python pur, sans HTML/JS).\n"
-                    "- **Conteneurisation** : Docker (image légère `python:3.9-slim`, utilisateur non-root).\n"
-                    "- **Orchestration** : Docker Compose pour gérer l'application et ses dépendances.\n"
-                    "- **CI/CD** : GitHub Actions (11 tests unitaires + build automatique de l'image Docker).\n"
-                    "- **Monitoring** : Prometheus (métriques exposées sur le port 8000, interface sur le port 9090).\n"
-                    "- **Déploiement** : Streamlit Community Cloud pour la démo publique, Docker en local pour le développement.\n\n"
-            
-                    "**Points clés :**\n"
-                    "- **Mise à jour automatique** toutes les 5 minutes.\n"
-                    "- **Export CSV** des données affichées.\n"
-                    "- **Sécurité** : CIDR /32 pour SSH, secrets gérés via `.env`, audit des dépendances Python.\n"
-                    "- **Évolutions prévues** : Migration vers PostgreSQL, ajout de Kubernetes, renforcement HTTPS.\n\n"
-            
-                    "Ce projet illustre une **stack moderne** pour une application data-driven, "
-                    "avec une attention particulière à la **maintenabilité**, la **sécurité** et l'**automatisation**."
+                    "TopGainersCrypto est une application web qui affiche les 10 crypto-monnaies "
+                    "les plus performantes sur 24h. "
+                    "Collecte : l'API CoinGecko fournit les prix en temps réel via HTTP JSON. "
+                    "Stockage : SQLite sauvegarde l'historique et sert de fallback si l'API est indisponible. "
+                    "Affichage : Streamlit génère l'interface web en Python pur, sans HTML ni JavaScript, "
+                    "avec rafraîchissement automatique toutes les 5 minutes et export CSV. "
+                    "Conteneurisation : Docker empaquète l'application dans une image python:3.9-slim avec un "
+                    "utilisateur non-root, Docker Compose orchestre l'ensemble. "
+                    "CI/CD : GitHub Actions lance 11 tests unitaires à chaque push. Si tout passe, "
+                    "le build Docker se déclenche automatiquement. "
+                    "Monitoring : prometheus_client expose 5 métriques sur le port 8000. "
+                    "Prometheus les collecte et les rend interrogeables sur le port 9090 en PromQL. "
+                    "Déploiement : Streamlit Community Cloud pour l'interface publique, "
+                    "Docker en local pour le développement et le monitoring."
                 )
             },
-            # ── SECTION 01 — Contexte & Projet ──────────────────────────────
+            # ── SECTION 01 — Contexte & Projet ──────────────────────────────────────────────────
             {
                 "type": "qcm",
                 "section": "Contexte & Projet",
@@ -596,7 +588,7 @@ COURSE_CONTENT = [
                     "l'historique SQLite ont tous été conservés et livrés."
                 ),
             },
-            # ── SECTION 02 — Architecture ────────────────────────────────────
+            # ── SECTION 02 — Architecture ─────────────────────────────────────────────────────────
             {
                 "type": "qcm",
                 "section": "Architecture technique",
@@ -644,7 +636,7 @@ COURSE_CONTENT = [
                     "via prometheus_client sur le port 8000."
                 ),
             },
-            # ── SECTION 03 — Docker ──────────────────────────────────────────
+            # ── SECTION 03 — Docker ────────────────────────────────────────────────────────────────
             {
                 "type": "qcm",
                 "section": "Conteneurisation Docker",
@@ -731,7 +723,7 @@ COURSE_CONTENT = [
                     "sur l'hôte et survivent aux redémarrages et reconstructions d'image."
                 ),
             },
-            # ── SECTION 04 — CI/CD ───────────────────────────────────────────
+            # ── SECTION 04 — CI/CD ─────────────────────────────────────────────────────────────────
             {
                 "type": "qcm",
                 "section": "CI/CD GitHub Actions",
@@ -785,7 +777,7 @@ COURSE_CONTENT = [
                     "déploiement se font automatiquement sans intervention manuelle."
                 ),
             },
-            # ── SECTION 05 — Prometheus ──────────────────────────────────────
+            # ── SECTION 05 — Prometheus ────────────────────────────────────────────────────────────
             {
                 "type": "qcm",
                 "section": "Monitoring Prometheus",
@@ -820,7 +812,7 @@ COURSE_CONTENT = [
                     "Le port 8501 est Streamlit. Le port 3000 serait Grafana."
                 ),
             },
-            # ── SECTION 06 — Compétences ─────────────────────────────────────
+            # ── SECTION 06 — Compétences ────────────────────────────────────────────────────────────
             {
                 "type": "qcm",
                 "section": "Compétences du titre",
