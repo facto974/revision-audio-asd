@@ -63,6 +63,7 @@
     flex: 1;
     overflow-y: auto;
     padding: 12px 0;
+    padding-bottom: 120px; /* Space for audio player */
 }
 
 .nav-item {
