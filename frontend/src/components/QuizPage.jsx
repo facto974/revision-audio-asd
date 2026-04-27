@@ -1,6 +1,6 @@
 // frontend/src/components/QuizPage.jsx
 import { useState, useEffect, useMemo } from "react";
-import { QCM, JURY_QUESTIONS } from "../data/quizData";
+import { QCM } from "../data/quizData";
 
 const STORAGE_KEY_QCM = "asd-quiz-answers";
 
@@ -11,7 +11,7 @@ const loadJSON = (k, fallback) => {
 const saveJSON = (k, v) => { try { localStorage.setItem(k, JSON.stringify(v)); } catch { /* ignore */ } };
 
 export default function QuizPage({ onBack }) {
-  const [tab, setTab] = useState("qcm"); // "qcm" | "jury" | "results"
+  const [tab, setTab] = useState("qcm"); // "qcm" | "results"
   const [answers, setAnswers] = useState(() => loadJSON(STORAGE_KEY_QCM, {}));   // { "0": {chosen: 1, correct: true}, ... }
 
   useEffect(() => saveJSON(STORAGE_KEY_QCM, answers), [answers]);
@@ -83,7 +83,6 @@ export default function QuizPage({ onBack }) {
       <div style={S.tabsWrap}>
         <div style={S.tabs}>
           <TabBtn id="qcm"     active={tab === "qcm"}     onClick={() => setTab("qcm")}>📝 QCM Théorique &amp; Pratique <Badge active={tab==="qcm"}>{QCM.length}</Badge></TabBtn>
-          <TabBtn id="jury"    active={tab === "jury"}    onClick={() => setTab("jury")}>🎤 Questions de Jury <Badge active={tab==="jury"}>{JURY_QUESTIONS.length}</Badge></TabBtn>
           <TabBtn id="results" active={tab === "results"} onClick={() => setTab("results")}>📊 Résultats</TabBtn>
         </div>
       </div>
@@ -91,7 +90,6 @@ export default function QuizPage({ onBack }) {
       {/* Main */}
       <div style={S.main}>
         {tab === "qcm"     && <QcmSection answers={answers} onAnswer={handleAnswer} />}
-        {tab === "jury"    && <JurySection />}
         {tab === "results" && <ResultsPanel answers={answers} onReset={resetAll} />}
       </div>
     </div>
@@ -225,35 +223,6 @@ function QcmCard({ index, q, answer, onAnswer }) {
         </div>
       )}
     </div>
-  );
-}
-
-function JurySection() {
-  return (
-    <>
-      <div style={{ ...S.introCard, background: "#5A3010" }}>
-        <div style={{ fontSize: "1.8rem" }}>🎤</div>
-        <p style={S.introText}>
-          <strong style={{ color: "#FFC000" }}>Simulation jury :</strong> voici les questions types posées par les jurys ASD avec leur réponse modèle. Lis-les à voix haute pour t'entraîner.
-        </p>
-      </div>
-      <div style={{ ...S.sectionLabel, background: "#ED7D31" }}>🎤 Questions types de jury ASD</div>
-      {JURY_QUESTIONS.map((jq, i) => (
-        <div key={i} style={{ ...S.card, borderLeftColor: "#ED7D31" }}>
-          <div style={S.qHeader}>
-            <div style={{ ...S.qNum, background: "#ED7D31" }}>{i + 1}</div>
-            <div style={S.qText}>{jq.q}</div>
-            <span style={{ ...S.qTypeTag, ...S.tagJury }}>Jury</span>
-          </div>
-          <div style={{ padding: "0 1.25rem 1rem" }}>
-            <div style={S.juryModel}>
-              <strong style={{ color: "#ED7D31", display: "block", marginBottom: "0.3rem" }}>💡 Réponse modèle :</strong>
-              {jq.model}
-            </div>
-          </div>
-        </div>
-      ))}
-    </>
   );
 }
 
