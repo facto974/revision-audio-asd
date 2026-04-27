@@ -533,7 +533,7 @@ COURSE_CONTENT = [
                 ),
             },
             {
-                "type": "project_overview",
+                "type": "concept",
                 "title": "Présentation rapide du projet TopGainersCrypto",
                 "text": (
                     "TopGainersCrypto est une **application web** développée en Python avec **Streamlit**, "
