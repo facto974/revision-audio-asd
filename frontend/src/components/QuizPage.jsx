@@ -121,6 +121,7 @@ function QcmSection({ answers, onAnswer }) {
   let currentSection = "";
   return (
     <>
+      <ProjectPresentation />
       <div style={S.introCard}>
         <div style={{ fontSize: "1.8rem" }}>🎯</div>
         <p style={S.introText}>
@@ -145,6 +146,42 @@ function QcmSection({ answers, onAnswer }) {
         );
       })}
     </>
+  );
+}
+
+// ─── Présentation projet (avant les QCM) ─────────────────────────────────────
+const PROJECT_BRIEF = [
+  { icon: "📥", label: "Collecte",         text: "API CoinGecko → prix temps réel en HTTP/JSON." },
+  { icon: "💾", label: "Stockage",         text: "SQLite sauvegarde l'historique et sert de fallback si l'API est indisponible." },
+  { icon: "🖥️", label: "Affichage",        text: "Streamlit en Python pur (sans HTML/JS), rafraîchissement auto toutes les 5 min, export CSV." },
+  { icon: "📦", label: "Conteneurisation", text: "Image Docker python:3.9-slim, utilisateur non-root, Docker Compose pour l'orchestration." },
+  { icon: "⚙️", label: "CI/CD",            text: "GitHub Actions lance 11 tests unitaires à chaque push — si tout passe, le build Docker se déclenche automatiquement." },
+  { icon: "📊", label: "Monitoring",       text: "prometheus_client expose 5 métriques sur :8000, Prometheus les interroge en PromQL sur :9090." },
+  { icon: "🚀", label: "Déploiement",      text: "Streamlit Community Cloud pour l'interface publique, Docker en local pour le dev et le monitoring." },
+];
+
+function ProjectPresentation() {
+  return (
+    <div style={S.briefCard} data-testid="project-brief">
+      <div style={S.briefHeader}>
+        <div style={S.briefBadge}>📋 Présentation projet</div>
+        <h2 style={S.briefTitle}>TopGainersCrypto</h2>
+        <p style={S.briefSubtitle}>
+          Application web qui affiche les <strong>10 crypto-monnaies les plus performantes</strong> sur 24h.
+        </p>
+      </div>
+      <div style={S.briefGrid}>
+        {PROJECT_BRIEF.map((b, i) => (
+          <div key={i} style={S.briefItem}>
+            <div style={S.briefIcon}>{b.icon}</div>
+            <div style={S.briefContent}>
+              <div style={S.briefLabel}>{b.label}</div>
+              <div style={S.briefText}>{b.text}</div>
+            </div>
+          </div>
+        ))}
+      </div>
+    </div>
   );
 }
 
@@ -326,4 +363,17 @@ const S = {
   resultBarFill: { height: "100%", borderRadius: 5, transition: "width 0.6s ease" },
   resultRowScore: { minWidth: 45, textAlign: "right", fontWeight: 700, color: "#1F3864" },
   resetBtn: { padding: "0.6rem 1.5rem", background: "#4472C4", color: "white", border: "none", borderRadius: 6, cursor: "pointer", fontSize: "0.85rem", fontWeight: 700, marginTop: "1rem" },
+
+  // ── Présentation projet ──
+  briefCard: { background: "white", borderRadius: 10, boxShadow: "0 4px 14px rgba(31,56,100,0.10)", marginBottom: "1.5rem", overflow: "hidden", border: "1px solid #E1E7F0" },
+  briefHeader: { background: "linear-gradient(135deg, #1F3864 0%, #4472C4 100%)", color: "white", padding: "1.25rem 1.5rem 1.1rem" },
+  briefBadge: { display: "inline-block", background: "#ED7D31", color: "white", padding: "0.2rem 0.65rem", borderRadius: 4, fontSize: "0.68rem", fontWeight: 700, letterSpacing: "0.5px", textTransform: "uppercase", marginBottom: "0.5rem" },
+  briefTitle: { fontSize: "1.35rem", fontWeight: 700, margin: 0, lineHeight: 1.2 },
+  briefSubtitle: { fontSize: "0.88rem", lineHeight: 1.5, color: "#D6E1F2", margin: "0.4rem 0 0", fontWeight: 400 },
+  briefGrid: { display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(260px, 1fr))", gap: "0.1rem", background: "#E1E7F0" },
+  briefItem: { background: "white", padding: "0.85rem 1rem", display: "flex", gap: "0.7rem", alignItems: "flex-start" },
+  briefIcon: { fontSize: "1.3rem", flexShrink: 0, lineHeight: 1.3 },
+  briefContent: { flex: 1, minWidth: 0 },
+  briefLabel: { fontSize: "0.78rem", fontWeight: 700, color: "#1F3864", textTransform: "uppercase", letterSpacing: "0.4px", marginBottom: "0.15rem" },
+  briefText: { fontSize: "0.83rem", lineHeight: 1.45, color: "#44546A" },
 };
