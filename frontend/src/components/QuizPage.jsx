@@ -2,8 +2,7 @@
 import { useState, useEffect, useMemo } from "react";
 import { QCM, JURY_QUESTIONS } from "../data/quizData";
 
-const STORAGE_KEY_QCM  = "asd-quiz-answers";
-const STORAGE_KEY_JURY = "asd-jury-revealed";
+const STORAGE_KEY_QCM = "asd-quiz-answers";
 
 const loadJSON = (k, fallback) => {
   try { const s = localStorage.getItem(k); return s ? JSON.parse(s) : fallback; }
@@ -14,10 +13,8 @@ const saveJSON = (k, v) => { try { localStorage.setItem(k, JSON.stringify(v)); }
 export default function QuizPage({ onBack }) {
   const [tab, setTab] = useState("qcm"); // "qcm" | "jury" | "results"
   const [answers, setAnswers] = useState(() => loadJSON(STORAGE_KEY_QCM, {}));   // { "0": {chosen: 1, correct: true}, ... }
-  const [revealed, setRevealed] = useState(() => loadJSON(STORAGE_KEY_JURY, {})); // { "0": true, ... }
 
   useEffect(() => saveJSON(STORAGE_KEY_QCM, answers), [answers]);
-  useEffect(() => saveJSON(STORAGE_KEY_JURY, revealed), [revealed]);
 
   const totals = useMemo(() => {
     const entries = Object.values(answers);
@@ -32,11 +29,10 @@ export default function QuizPage({ onBack }) {
     setAnswers(prev => ({ ...prev, [qi]: { chosen, correct } }));
   };
 
-  const revealJury = (i) => setRevealed(prev => ({ ...prev, [i]: true }));
-
   const resetAll = () => {
     if (!window.confirm("Effacer toutes tes réponses ?")) return;
-    setAnswers({}); setRevealed({});
+    setAnswers({});
+    try { localStorage.removeItem("asd-jury-revealed"); } catch { /* legacy cleanup */ }
   };
 
   const progressPct = (totals.totalAnswered / QCM.length) * 100;
@@ -95,7 +91,7 @@ export default function QuizPage({ onBack }) {
       {/* Main */}
       <div style={S.main}>
         {tab === "qcm"     && <QcmSection answers={answers} onAnswer={handleAnswer} />}
-        {tab === "jury"    && <JurySection revealed={revealed} onReveal={revealJury} />}
+        {tab === "jury"    && <JurySection />}
         {tab === "results" && <ResultsPanel answers={answers} onReset={resetAll} />}
       </div>
     </div>
@@ -232,13 +228,13 @@ function QcmCard({ index, q, answer, onAnswer }) {
   );
 }
 
-function JurySection({ revealed, onReveal }) {
+function JurySection() {
   return (
     <>
       <div style={{ ...S.introCard, background: "#5A3010" }}>
         <div style={{ fontSize: "1.8rem" }}>🎤</div>
         <p style={S.introText}>
-          <strong style={{ color: "#FFC000" }}>Simulation jury :</strong> rédige ta réponse dans le champ texte, puis clique sur "Voir la réponse modèle" pour te comparer.
+          <strong style={{ color: "#FFC000" }}>Simulation jury :</strong> voici les questions types posées par les jurys ASD avec leur réponse modèle. Lis-les à voix haute pour t'entraîner.
         </p>
       </div>
       <div style={{ ...S.sectionLabel, background: "#ED7D31" }}>🎤 Questions types de jury ASD</div>
@@ -250,14 +246,10 @@ function JurySection({ revealed, onReveal }) {
             <span style={{ ...S.qTypeTag, ...S.tagJury }}>Jury</span>
           </div>
           <div style={{ padding: "0 1.25rem 1rem" }}>
-            <textarea style={S.textarea} placeholder="Écris ta réponse ici pour t'entraîner..." />
-            <button style={S.revealBtn} onClick={() => onReveal(i)}>Voir la réponse modèle</button>
-            {revealed[i] && (
-              <div style={S.juryModel}>
-                <strong style={{ color: "#ED7D31", display: "block", marginBottom: "0.3rem" }}>💡 Réponse modèle :</strong>
-                {jq.model}
-              </div>
-            )}
+            <div style={S.juryModel}>
+              <strong style={{ color: "#ED7D31", display: "block", marginBottom: "0.3rem" }}>💡 Réponse modèle :</strong>
+              {jq.model}
+            </div>
           </div>
         </div>
       ))}
@@ -352,9 +344,9 @@ const S = {
   explanation: { margin: "0 1.25rem 1rem", padding: "0.7rem 1rem", borderRadius: 6, fontSize: "0.85rem", lineHeight: 1.5 },
   expCorrect: { background: "#EBF6E1", borderLeft: "3px solid #70AD47", color: "#2D6A12" },
   expWrong:   { background: "#FBE8E8", borderLeft: "3px solid #C00000", color: "#8B0000" },
-  textarea: { width: "100%", minHeight: 80, padding: "0.65rem 0.9rem", border: "1.5px solid #D6DCE4", borderRadius: 6, fontSize: "0.87rem", color: "#44546A", resize: "vertical", fontFamily: "inherit" },
-  revealBtn: { marginTop: "0.6rem", padding: "0.5rem 1.2rem", background: "#ED7D31", color: "white", border: "none", borderRadius: 6, cursor: "pointer", fontSize: "0.82rem", fontWeight: 700 },
-  juryModel: { marginTop: "0.75rem", padding: "0.75rem 1rem", background: "#FEF0E6", borderLeft: "3px solid #ED7D31", borderRadius: "0 6px 6px 0", fontSize: "0.85rem", lineHeight: 1.55, color: "#5A3010" },
+  textarea: { width: "100%", minHeight: 80, padding: "0.65rem 0.9rem", border: "1.5px solid #D6DCE4", borderRadius: 6, fontSize: "0.87rem", color: "#44546A", resize: "vertical", fontFamily: "inherit" }, // legacy, kept for safety
+  revealBtn: { marginTop: "0.6rem", padding: "0.5rem 1.2rem", background: "#ED7D31", color: "white", border: "none", borderRadius: 6, cursor: "pointer", fontSize: "0.82rem", fontWeight: 700 }, // legacy, kept for safety
+  juryModel: { padding: "0.85rem 1rem", background: "#FEF0E6", borderLeft: "3px solid #ED7D31", borderRadius: "0 6px 6px 0", fontSize: "0.88rem", lineHeight: 1.6, color: "#5A3010" },
   resultsPanel: { background: "white", borderRadius: 8, boxShadow: "0 2px 10px rgba(0,0,0,0.07)", padding: "1.5rem" },
   resultsTitle: { fontSize: "1.1rem", fontWeight: 700, color: "#1F3864", marginBottom: "1rem" },
   resultRow: { display: "flex", alignItems: "center", gap: "0.75rem", fontSize: "0.85rem" },
