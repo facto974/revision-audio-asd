@@ -163,7 +163,7 @@ export default function App() {
   const [mode,            setMode]            = useState("audio");
   const [ttsMode,         setTtsMode]         = useState("edge"); // "edge" (natural) or "browser"
   const [edgeVoices,      setEdgeVoices]      = useState([]);
-  const [selectedEdgeVoice, setSelectedEdgeVoice] = useState("fr-FR-DeniseNeural");
+  const [selectedEdgeVoice, setSelectedEdgeVoice] = useState("fr-FR-HenriNeural");
   const [isLoadingAudio,  setIsLoadingAudio]  = useState(false);
 
   const synthRef          = useRef(window.speechSynthesis);
