@@ -7,13 +7,13 @@ import { COURSE_CONTENT } from "./data/courseContent";
 import {
   Play, Pause, Square, Volume2, Menu, X, CheckCircle2,
   Brain, Server, Container, Activity, HelpCircle, ChevronRight, ChevronLeft,
-  Terminal, Shield, Cloud, GitBranch, Database, Layers, BarChart, Globe, Wrench, Volume1,
+  Terminal, Shield, Cloud, GitBranch, Database, Layers, BarChart, Globe, Wrench, Volume1, Link,
 } from "lucide-react";
 import QuizPage from "./components/QuizPage";
 
 const iconMap = {
   Brain, Server, Container, Activity, HelpCircle, Terminal,
-  Shield, Cloud, GitBranch, Database, Layers, BarChart, Globe, Wrench,
+  Shield, Cloud, GitBranch, Database, Layers, BarChart, Globe, Wrench, Link,
 };
 
 // ─── LocalStorage ─────────────────────────────────────────────────────────────
@@ -113,8 +113,13 @@ export default function App() {
   const [sidebarOpen,     setSidebarOpen]     = useState(false);
   const [progress,        setProgress]        = useState(0);
   const [mode,            setMode]            = useState("audio");
+  const [ttsMode,         setTtsMode]         = useState("edge"); // "edge" (natural) or "browser"
+  const [edgeVoices,      setEdgeVoices]      = useState([]);
+  const [selectedEdgeVoice, setSelectedEdgeVoice] = useState("fr-FR-DeniseNeural");
+  const [isLoadingAudio,  setIsLoadingAudio]  = useState(false);
 
   const synthRef          = useRef(window.speechSynthesis);
+  const audioRef          = useRef(null); // For Edge TTS audio element
   const continuousRef     = useRef(false);
   const currentIndexRef   = useRef(0);
   const primedRef         = useRef(false); // Android first-play unlock
@@ -153,6 +158,27 @@ export default function App() {
     if (synth.onvoiceschanged !== undefined) synth.onvoiceschanged = load;
     const timers = [100, 300, 700, 1500, 3000].map(ms => setTimeout(load, ms));
     return () => { timers.forEach(clearTimeout); synth.onvoiceschanged = null; };
+  }, []);
+
+  // ── Load Edge TTS voices ────────────────────────────────────────────────────
+  useEffect(() => {
+    const loadEdgeVoices = async () => {
+      try {
+        const API_BASE = process.env.REACT_APP_BACKEND_URL || "";
+        const res = await fetch(`${API_BASE}/api/tts/voices`);
+        if (res.ok) {
+          const data = await res.json();
+          setEdgeVoices(data);
+        }
+      } catch (e) {
+        console.log("Edge voices not available, using defaults");
+        setEdgeVoices([
+          { name: "fr-FR-DeniseNeural", gender: "Female", locale: "fr-FR" },
+          { name: "fr-FR-HenriNeural", gender: "Male", locale: "fr-FR" },
+        ]);
+      }
+    };
+    loadEdgeVoices();
   }, []);
 
   // ── Cleanup on unmount ─────────────────────────────────────────────────────
@@ -354,6 +380,43 @@ export default function App() {
   const renderBlock = (block, index) => {
     const active  = index === currentBlockIndex && isPlaying;
     const current = index === currentBlockIndex;
+    
+    // Special rendering for tool_card type
+    if (block.type === "tool_card") {
+      return (
+        <div
+          key={index}
+          data-testid={`content-block-${index}`}
+          className={`tool-card${active ? " speech-highlight" : ""}${current && !isPlaying ? " block-current" : ""}`}
+          onClick={() => handleBlockClick(index)}
+          title="Cliquez pour écouter"
+        >
+          <div className="block-play-indicator"><Volume1 size={16} /></div>
+          <div className="tool-card-header">
+            <span className="tool-emoji">{block.emoji}</span>
+            <div className="tool-info">
+              <h3 className="tool-name">{block.tool}</h3>
+              <p className="tool-analogy">{block.analogy}</p>
+            </div>
+          </div>
+          <div className="tool-card-body">
+            <div className="tool-row">
+              <span className="tool-label">Ce que ça fait</span>
+              <p className="tool-value">{block.description}</p>
+            </div>
+            <div className="tool-row">
+              <span className="tool-label">Pourquoi c'est utile</span>
+              <p className="tool-value">{block.why_useful}</p>
+            </div>
+            <div className="tool-row tool-link">
+              <span className="tool-label">Lien suivant</span>
+              <p className="tool-value">{block.link_next} <span className="next-arrow">↓ {block.next_tool}</span></p>
+            </div>
+          </div>
+        </div>
+      );
+    }
+    
     return (
       <div
         key={index}

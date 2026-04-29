@@ -9,7 +9,8 @@ import logging
 import re
 import io
 import tempfile
-import pyttsx3
+import edge_tts
+import asyncio
 from pathlib import Path
 from pydantic import BaseModel, Field, ConfigDict
 from typing import List, Optional, Dict, Any
@@ -253,6 +254,21 @@ def generate_audio_for_item(engine: pyttsx3.Engine, item: dict) -> bytes:
             f"Réponse modèle : {model_answer}."
         )
         return _render_tts(engine, spoken, rate=145)
+    # ── Tool card (chaîne DevOps) ──────────────────────────────────────────────
+    elif item_type == "tool_card":
+        tool = item.get("tool", "")
+        analogy = item.get("analogy", "")
+        description = item.get("description", "")
+        why_useful = item.get("why_useful", "")
+        link_next = item.get("link_next", "")
+        spoken = (
+            f"Outil : {tool}. "
+            f"Analogie : {analogy}. "
+            f"Ce que ça fait : {description}. "
+            f"Pourquoi c'est utile : {why_useful}. "
+            f"Lien avec l'outil suivant : {link_next}."
+        )
+        return _render_tts(engine, spoken, rate=145)
     # ── FIN NOUVEAUX TYPES ───────────────────────────────────────────────────
     elif item_type == "jury":
         spoken = f"Attention, question piège du jury. {item.get('title', '')}. {text}"
@@ -282,6 +298,93 @@ COURSE_CONTENT = [
             {"type": "method", "text": "Quatrième étape : lire, comprendre et adapter. Tu dois être capable d'expliquer chaque bloc avec tes propres mots. Vérifie la sécurité, les performances, les versions, les contraintes métier."},
             {"type": "method", "text": "Cinquième étape : tester et corriger. Commence par les cas simples, puis les cas limites. Si ça bug, explique à l'IA ce qui se passe et itère. Un développeur sans tests, c'est comme un électricien qui n'utilise pas le multimètre."},
             {"type": "jury", "title": "Question piège du jury", "text": "Le jury pourrait te demander : Vous avez utilisé l'IA, donc vous ne comprenez pas votre code ? Ta réponse : Non, j'ai utilisé l'IA comme outil d'accélération. Pour chaque bloc généré, j'ai appliqué ma méthode : lire, comprendre, adapter, tester. Je peux expliquer chaque ligne de mon Dockerfile, de mon fichier Terraform, de mon pipeline CI/CD."},
+        ],
+    },
+    {
+        "id": "chaine_devops", "title": "Chaîne DevOps : Les Outils", "icon": "Link",
+        "content": [
+            {"type": "intro", "text": "Voici la chaîne complète des outils DevOps avec une analogie cuisine pour mieux comprendre le rôle de chaque outil et comment ils s'enchaînent."},
+            {
+                "type": "tool_card",
+                "tool": "Git",
+                "emoji": "🐙",
+                "analogy": "Le carnet de recettes du cuistot",
+                "description": "Suit les modifications du code, gère les branches et les fusions.",
+                "why_useful": "Sans Git : impossible de travailler à plusieurs ou de revenir en arrière.",
+                "link_next": "Les commits Git sont poussés vers GitHub.",
+                "next_tool": "GitHub"
+            },
+            {
+                "type": "tool_card",
+                "tool": "GitHub / GitLab",
+                "emoji": "😺",
+                "analogy": "L'affichage des recettes en cuisine",
+                "description": "Stocke le code en ligne, gère les PR et déclenche des automatisations.",
+                "why_useful": "Centralise le code et sert de point de départ aux pipelines CI/CD.",
+                "link_next": "Un push déclenche Jenkins via les webhooks.",
+                "next_tool": "Jenkins"
+            },
+            {
+                "type": "tool_card",
+                "tool": "Jenkins (CI/CD)",
+                "emoji": "🤖",
+                "analogy": "Le robot cuisinier qui prépare le plat",
+                "description": "Automatise les étapes build → test → déploiement.",
+                "why_useful": "Supprime le travail manuel, garantit des livraisons rapides et fiables.",
+                "link_next": "Jenkins construit des images Docker comme artefacts.",
+                "next_tool": "Docker"
+            },
+            {
+                "type": "tool_card",
+                "tool": "Docker",
+                "emoji": "🐳",
+                "analogy": "La barquette hermétique du plat cuisiné",
+                "description": "Empaquette l'app et ses dépendances dans un conteneur portable.",
+                "why_useful": "Garantit que l'appli tourne pareil partout : 'ça marche sur ma machine' résolu.",
+                "link_next": "Jenkins pousse l'image → Kubernetes la déploie.",
+                "next_tool": "Kubernetes"
+            },
+            {
+                "type": "tool_card",
+                "tool": "Kubernetes (K8s)",
+                "emoji": "☸️",
+                "analogy": "Le chef de salle qui gère tous les services",
+                "description": "Lance les conteneurs à grande échelle : auto-réparation, mise à l'échelle, équilibrage.",
+                "why_useful": "Indispensable pour des microservices robustes en production.",
+                "link_next": "K8s a besoin de serveurs → Terraform les crée.",
+                "next_tool": "Terraform"
+            },
+            {
+                "type": "tool_card",
+                "tool": "Terraform (IaC)",
+                "emoji": "🏗️",
+                "analogy": "Les plans du restaurant (tables, cuisine...)",
+                "description": "Crée l'infrastructure cloud (VMs, réseaux, stockage) via du code.",
+                "why_useful": "Infrastructure reproductible et versionnée : fini les clics manuels dans la console.",
+                "link_next": "Serveurs créés → Ansible les configure.",
+                "next_tool": "Ansible"
+            },
+            {
+                "type": "tool_card",
+                "tool": "Ansible",
+                "emoji": "🤖",
+                "analogy": "L'équipe qui installe et règle tout avant ouverture",
+                "description": "Installe les logiciels, configure les serveurs, définit l'environnement.",
+                "why_useful": "Évite des heures de configuration manuelle et garantit l'homogénéité.",
+                "link_next": "Après déploiement, les outils de monitoring prennent le relais.",
+                "next_tool": "Prometheus / Grafana"
+            },
+            {
+                "type": "tool_card",
+                "tool": "Prometheus / Grafana",
+                "emoji": "📊",
+                "analogy": "L'inspecteur sanitaire + alarme incendie",
+                "description": "Collecte les métriques et logs, envoie des alertes en cas d'anomalie.",
+                "why_useful": "Critique pour la disponibilité, le debug et la stabilité en production.",
+                "link_next": "Observe tout le système → alerte les ingénieurs qui corrigent.",
+                "next_tool": "Retour aux équipes"
+            },
+            {"type": "concept", "title": "Résumé de la chaîne", "text": "Git pousse vers GitHub. GitHub déclenche Jenkins. Jenkins build Docker. Kubernetes déploie les conteneurs. Terraform crée l'infrastructure. Ansible configure les serveurs. Prometheus surveille le tout. C'est un cycle continu d'amélioration."},
         ],
     },
     {
@@ -1859,6 +1962,94 @@ async def get_audio(section_id: str):
         media_type="audio/wav",
         headers={"Content-Disposition": f"attachment; filename={section_id}.wav"}
     )
+
+# ====================== EDGE TTS (Natural Voice) ======================
+EDGE_VOICE = "fr-FR-DeniseNeural"  # Voix française naturelle
+
+async def generate_edge_audio(text: str, voice: str = EDGE_VOICE, rate: str = "-10%") -> bytes:
+    """Generate audio using Edge TTS (Microsoft natural voices)"""
+    communicate = edge_tts.Communicate(text, voice, rate=rate)
+    audio_data = b""
+    async for chunk in communicate.stream():
+        if chunk["type"] == "audio":
+            audio_data += chunk["data"]
+    return audio_data
+
+def get_item_text_for_tts(item: dict) -> str:
+    """Extract text from course item for TTS"""
+    item_type = item.get("type", "")
+    text = item.get("text", "")
+    title = item.get("title", "")
+    
+    if item_type == "qa":
+        question = item.get("question", "")
+        answer = item.get("answer", "")
+        return f"Question. {question}. Réponse. {answer}"
+    elif item_type == "jury_open":
+        model = item.get("model_answer", "")
+        return f"Question de jury. {title}. Réponse modèle. {model}"
+    elif item_type == "qcm":
+        q = item.get("question", "")
+        opts = item.get("options", [])
+        correct = item.get("correct", 0)
+        exp = item.get("explanation", "")
+        opts_text = ". ".join([f"Option {chr(65+i)}, {o}" for i, o in enumerate(opts)])
+        return f"Question. {q}. {opts_text}. La bonne réponse est {chr(65+correct)}. {exp}"
+    elif item_type == "tool_card":
+        tool = item.get("tool", "")
+        analogy = item.get("analogy", "")
+        description = item.get("description", "")
+        why_useful = item.get("why_useful", "")
+        link_next = item.get("link_next", "")
+        return f"Outil : {tool}. Analogie : {analogy}. Ce que ça fait : {description}. Pourquoi c'est utile : {why_useful}. Lien suivant : {link_next}."
+    elif title:
+        return f"{title}. {text}"
+    else:
+        return text
+
+@api_router.get("/tts/block/{section_id}/{block_index}")
+async def get_edge_tts_block(section_id: str, block_index: int, voice: str = EDGE_VOICE, rate: str = "-10%"):
+    """Get natural TTS audio for a single block using Edge TTS"""
+    section = next((s for s in COURSE_CONTENT if s["id"] == section_id), None)
+    if not section:
+        raise HTTPException(status_code=404, detail="Section non trouvée")
+    
+    if block_index < 0 or block_index >= len(section["content"]):
+        raise HTTPException(status_code=404, detail="Block non trouvé")
+    
+    item = section["content"][block_index]
+    text = get_item_text_for_tts(item)
+    
+    if not text.strip():
+        raise HTTPException(status_code=400, detail="Pas de texte à lire")
+    
+    try:
+        audio_data = await generate_edge_audio(text, voice, rate)
+        return StreamingResponse(
+            iter([audio_data]),
+            media_type="audio/mpeg",
+            headers={"Content-Disposition": f"inline; filename=block_{block_index}.mp3"}
+        )
+    except Exception as e:
+        logging.error(f"Edge TTS error: {e}")
+        raise HTTPException(status_code=500, detail=str(e))
+
+@api_router.get("/tts/voices")
+async def get_available_voices():
+    """Get list of available French voices"""
+    try:
+        voices = await edge_tts.list_voices()
+        french_voices = [v for v in voices if v["Locale"].startswith("fr-")]
+        return JSONResponse(content=[{
+            "name": v["ShortName"],
+            "gender": v["Gender"],
+            "locale": v["Locale"]
+        } for v in french_voices])
+    except Exception as e:
+        return JSONResponse(content=[
+            {"name": "fr-FR-DeniseNeural", "gender": "Female", "locale": "fr-FR"},
+            {"name": "fr-FR-HenriNeural", "gender": "Male", "locale": "fr-FR"},
+        ])
 
 @api_router.post("/progress")
 async def save_progress(progress: UserProgress):

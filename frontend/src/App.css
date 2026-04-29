@@ -502,3 +502,130 @@
 .sidebar-nav::-webkit-scrollbar-thumb:hover {
     background: #9CA3AF;
 }
+
+
+/* Tool Cards - DevOps Chain */
+.tool-card {
+    background: linear-gradient(145deg, #1a1a1a 0%, #2d2d2d 100%);
+    border-radius: 12px;
+    padding: 20px;
+    margin-bottom: 16px;
+    cursor: pointer;
+    transition: all 0.2s ease;
+    border: 1px solid #3d3d3d;
+    position: relative;
+}
+
+.tool-card:hover {
+    transform: translateY(-2px);
+    box-shadow: 0 8px 24px rgba(0, 0, 0, 0.3);
+    border-color: #4d4d4d;
+}
+
+.tool-card.speech-highlight {
+    border-color: #ED7D31;
+    box-shadow: 0 0 0 2px rgba(237, 125, 49, 0.3);
+}
+
+.tool-card.block-current {
+    border-color: #2563EB;
+}
+
+.tool-card .block-play-indicator {
+    position: absolute;
+    top: 12px;
+    right: 12px;
+    color: #666;
+}
+
+.tool-card-header {
+    display: flex;
+    align-items: center;
+    gap: 16px;
+    margin-bottom: 16px;
+    padding-bottom: 16px;
+    border-bottom: 1px solid #3d3d3d;
+}
+
+.tool-emoji {
+    font-size: 2.5rem;
+    line-height: 1;
+}
+
+.tool-info {
+    flex: 1;
+}
+
+.tool-name {
+    font-size: 1.25rem;
+    font-weight: 700;
+    color: #ffffff;
+    margin: 0 0 4px 0;
+    font-family: 'IBM Plex Sans', sans-serif;
+}
+
+.tool-analogy {
+    font-size: 0.9rem;
+    color: #a0a0a0;
+    margin: 0;
+    font-style: italic;
+}
+
+.tool-card-body {
+    display: flex;
+    flex-direction: column;
+    gap: 12px;
+}
+
+.tool-row {
+    display: flex;
+    flex-direction: column;
+    gap: 4px;
+}
+
+.tool-label {
+    font-size: 0.7rem;
+    font-weight: 600;
+    text-transform: uppercase;
+    letter-spacing: 0.05em;
+    color: #ED7D31;
+}
+
+.tool-value {
+    font-size: 0.95rem;
+    color: #e0e0e0;
+    margin: 0;
+    line-height: 1.5;
+}
+
+.tool-link {
+    margin-top: 8px;
+    padding-top: 12px;
+    border-top: 1px solid #3d3d3d;
+}
+
+.next-arrow {
+    display: inline-block;
+    margin-left: 8px;
+    padding: 2px 8px;
+    background: rgba(237, 125, 49, 0.2);
+    color: #ED7D31;
+    border-radius: 4px;
+    font-weight: 600;
+    font-size: 0.85rem;
+}
+
+/* Mobile adjustments for tool cards */
+@media (max-width: 768px) {
+    .tool-card {
+        padding: 16px;
+    }
+    
+    .tool-emoji {
+        font-size: 2rem;
+    }
+    
+    .tool-name {
+        font-size: 1.1rem;
+    }
+}

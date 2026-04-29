@@ -14,6 +14,21 @@ export const COURSE_CONTENT = [
     ],
   },
   {
+    id: "chaine_devops", title: "Chaîne DevOps : Les Outils", icon: "Link",
+    content: [
+      {type: "intro", text: "Voici la chaîne complète des outils DevOps avec une analogie cuisine pour mieux comprendre le rôle de chaque outil et comment ils s'enchaînent."},
+      {type: "tool_card", tool: "Git", emoji: "🐙", analogy: "Le carnet de recettes du cuistot", description: "Suit les modifications du code, gère les branches et les fusions.", why_useful: "Sans Git : impossible de travailler à plusieurs ou de revenir en arrière.", link_next: "Les commits Git sont poussés vers GitHub.", next_tool: "GitHub"},
+      {type: "tool_card", tool: "GitHub / GitLab", emoji: "😺", analogy: "L'affichage des recettes en cuisine", description: "Stocke le code en ligne, gère les PR et déclenche des automatisations.", why_useful: "Centralise le code et sert de point de départ aux pipelines CI/CD.", link_next: "Un push déclenche Jenkins via les webhooks.", next_tool: "Jenkins"},
+      {type: "tool_card", tool: "Jenkins (CI/CD)", emoji: "🤖", analogy: "Le robot cuisinier qui prépare le plat", description: "Automatise les étapes build → test → déploiement.", why_useful: "Supprime le travail manuel, garantit des livraisons rapides et fiables.", link_next: "Jenkins construit des images Docker comme artefacts.", next_tool: "Docker"},
+      {type: "tool_card", tool: "Docker", emoji: "🐳", analogy: "La barquette hermétique du plat cuisiné", description: "Empaquette l'app et ses dépendances dans un conteneur portable.", why_useful: "Garantit que l'appli tourne pareil partout : 'ça marche sur ma machine' résolu.", link_next: "Jenkins pousse l'image → Kubernetes la déploie.", next_tool: "Kubernetes"},
+      {type: "tool_card", tool: "Kubernetes (K8s)", emoji: "☸️", analogy: "Le chef de salle qui gère tous les services", description: "Lance les conteneurs à grande échelle : auto-réparation, mise à l'échelle, équilibrage.", why_useful: "Indispensable pour des microservices robustes en production.", link_next: "K8s a besoin de serveurs → Terraform les crée.", next_tool: "Terraform"},
+      {type: "tool_card", tool: "Terraform (IaC)", emoji: "🏗️", analogy: "Les plans du restaurant (tables, cuisine...)", description: "Crée l'infrastructure cloud (VMs, réseaux, stockage) via du code.", why_useful: "Infrastructure reproductible et versionnée : fini les clics manuels dans la console.", link_next: "Serveurs créés → Ansible les configure.", next_tool: "Ansible"},
+      {type: "tool_card", tool: "Ansible", emoji: "🤖", analogy: "L'équipe qui installe et règle tout avant ouverture", description: "Installe les logiciels, configure les serveurs, définit l'environnement.", why_useful: "Évite des heures de configuration manuelle et garantit l'homogénéité.", link_next: "Après déploiement, les outils de monitoring prennent le relais.", next_tool: "Prometheus / Grafana"},
+      {type: "tool_card", tool: "Prometheus / Grafana", emoji: "📊", analogy: "L'inspecteur sanitaire + alarme incendie", description: "Collecte les métriques et logs, envoie des alertes en cas d'anomalie.", why_useful: "Critique pour la disponibilité, le debug et la stabilité en production.", link_next: "Observe tout le système → alerte les ingénieurs qui corrigent.", next_tool: "Retour aux équipes"},
+      {type: "concept", title: "Résumé de la chaîne", text: "Git pousse vers GitHub. GitHub déclenche Jenkins. Jenkins build Docker. Kubernetes déploie les conteneurs. Terraform crée l'infrastructure. Ansible configure les serveurs. Prometheus surveille le tout. C'est un cycle continu d'amélioration."},
+    ],
+  },
+  {
     id: "cp1", title: "CP1 : Scripts Serveurs", icon: "Terminal",
     content: [
       {type: "intro", text: "Compétence 1 : Automatiser la création de serveurs à l'aide de scripts. Cette compétence couvre la virtualisation et les différents types de scripts."},
