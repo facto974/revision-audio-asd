@@ -72,145 +72,65 @@ function transformTextForAudio(text) {
   if (!text) return "";
   let t = text;
   
-  // Transcriptions phonétiques pour les termes anglais courants (prononciation française naturelle)
-  const englishTerms = [
-    // DevOps & Cloud
-    [/\bcloud\b/gi, "claoude"],
-    [/\bpipeline\b/gi, "païpe-laïne"],
-    [/\bworkflow\b/gi, "weurk-flo"],
-    [/\bdeployment\b/gi, "di-ploï-mennte"],
-    [/\bcontainer\b/gi, "konne-té-neur"],
-    [/\bcluster\b/gi, "kleusteur"],
-    [/\bnode\b/gi, "nod"],
-    [/\bpod\b/gi, "pod"],
-    [/\bimage\b/gi, "i-mage"],
-    [/\bregistry\b/gi, "rè-jis-tri"],
-    [/\bbuild\b/gi, "bilde"],
-    [/\bpush\b/gi, "pouche"],
-    [/\bpull\b/gi, "poule"],
-    [/\brollback\b/gi, "rol-bak"],
-    [/\brolling update\b/gi, "rolingue eup-déte"],
-    [/\bscaling\b/gi, "skélingue"],
-    [/\bautoscaling\b/gi, "oto-skélingue"],
-    [/\bload balancer\b/gi, "lod ba-lan-ceur"],
-    [/\bproxy\b/gi, "proksi"],
-    [/\breverse proxy\b/gi, "ri-veurse proksi"],
-    [/\bgateway\b/gi, "guéte-wé"],
-    [/\bfirewall\b/gi, "faïeur-wol"],
-    [/\bbackup\b/gi, "bak-eup"],
-    [/\brestore\b/gi, "ri-stor"],
-    [/\bsnapshot\b/gi, "snape-chote"],
-    [/\bstaging\b/gi, "sté-djingue"],
-    [/\bproduction\b/gi, "pro-deuk-cheune"],
-    
-    // Git & CI/CD
-    [/\bcommit\b/gi, "ko-mite"],
-    [/\bbranch\b/gi, "brantche"],
-    [/\bmerge\b/gi, "meurge"],
-    [/\brebase\b/gi, "ri-béze"],
-    [/\bcheckout\b/gi, "tchèk-aoute"],
-    [/\brepository\b/gi, "ri-pozi-tori"],
-    [/\brepo\b/gi, "ri-po"],
-    [/\btrigger\b/gi, "tri-gueur"],
-    [/\brunner\b/gi, "reu-neur"],
-    [/\bjob\b/gi, "djob"],
-    [/\bstep\b/gi, "stèpe"],
-    [/\bartifact\b/gi, "ar-ti-fakt"],
-    
-    // Infrastructure
-    [/\bprovider\b/gi, "pro-vaï-deur"],
-    [/\binstance\b/gi, "inne-stance"],
-    [/\bbucket\b/gi, "beu-kète"],
-    [/\bsubnet\b/gi, "seub-nète"],
-    [/\bsecurity group\b/gi, "si-kiou-ri-ti groupe"],
-    [/\bkey pair\b/gi, "ki père"],
-    [/\bstateful\b/gi, "stéte-foule"],
-    [/\bstateless\b/gi, "stéte-lèsse"],
-    [/\bidempotent\b/gi, "i-demm-po-tente"],
-    [/\bplaybook\b/gi, "plé-bouke"],
-    [/\binventory\b/gi, "inne-venne-tori"],
-    [/\btemplate\b/gi, "temm-pléte"],
-    [/\bmodule\b/gi, "mo-dioule"],
-    [/\bresource\b/gi, "ri-sorce"],
-    [/\boutput\b/gi, "aout-poute"],
-    [/\bstate\b/gi, "stéte"],
-    [/\block\b/gi, "loke"],
-    
-    // Monitoring
-    [/\bmonitoring\b/gi, "mo-ni-to-ringue"],
-    [/\bdashboard\b/gi, "dache-borde"],
-    [/\balert\b/gi, "a-leurte"],
-    [/\bscrape\b/gi, "skrépe"],
-    [/\bmetric\b/gi, "mé-trik"],
-    [/\bquery\b/gi, "kouéri"],
-    [/\bthroughput\b/gi, "troue-poute"],
-    [/\blatency\b/gi, "lé-tenn-ci"],
-    [/\buptime\b/gi, "eup-taïme"],
-    [/\bdowntime\b/gi, "daoun-taïme"],
-    [/\berror budget\b/gi, "éreur beu-djète"],
-    
-    // Sécurité
-    [/\bbrute force\b/gi, "broute force"],
-    [/\bhardening\b/gi, "ar-de-ningue"],
-    [/\baudit\b/gi, "o-dite"],
-    [/\btoken\b/gi, "to-keune"],
-    [/\bsecret\b/gi, "si-krète"],
-    [/\bcredentials\b/gi, "kré-denn-chals"],
-    [/\bvault\b/gi, "volte"],
-    
-    // Agile & Dev
-    [/\bsprint\b/gi, "sprinnte"],
-    [/\bbacklog\b/gi, "bak-log"],
-    [/\buser story\b/gi, "you-zeur stori"],
-    [/\bdefinition of done\b/gi, "dé-fi-ni-cheune of done"],
-    [/\bstandup\b/gi, "stannd-eup"],
-    [/\bdaily\b/gi, "dé-li"],
-    [/\bfeature\b/gi, "fi-tcheur"],
-    [/\bbug\b/gi, "beugue"],
-    [/\bfix\b/gi, "fikse"],
-    [/\bworkaround\b/gi, "weurk-a-raound"],
-    [/\bdeprecated\b/gi, "dé-pri-ké-ted"],
-    [/\boverhead\b/gi, "o-veur-hèd"],
-    [/\bupstream\b/gi, "eup-strim"],
-    [/\bdownstream\b/gi, "daoun-strim"],
-    
-    // Divers tech
-    [/\bshebang\b/gi, "chi-bangue"],
-    [/\bwildcard\b/gi, "waïld-kard"],
-    [/\btimeout\b/gi, "taïme-aoute"],
-    [/\bretry\b/gi, "ri-traï"],
-    [/\bcache\b/gi, "cache"],
-    [/\blayer\b/gi, "lé-yeur"],
-    [/\bhandler\b/gi, "ann-dleur"],
-    [/\bcallback\b/gi, "kol-bak"],
-    [/\bendpoint\b/gi, "ènnd-poïnnte"],
-    [/\bpayload\b/gi, "pé-lod"],
-    [/\bheader\b/gi, "hè-deur"],
-    [/\bbody\b/gi, "bo-di"],
-    [/\brequest\b/gi, "ri-kouèste"],
-    [/\bresponse\b/gi, "ri-sponze"],
-    [/\bstatus code\b/gi, "sta-teusse code"],
-    [/\bhealthcheck\b/gi, "helth-tchèk"],
-    [/\bhealth check\b/gi, "helth tchèk"],
-  ];
-  
-  // Appliquer les transcriptions phonétiques anglaises
-  for (const [p, r] of englishTerms) t = t.replace(p, r);
-  
-  // Transformations techniques existantes
+  // Seulement les transformations essentielles - garder les termes anglais tels quels
+  // car les voix modernes (Google, Microsoft) les prononcent correctement en anglais
   const rep = [
-    [/\.tf\b/g, " point TF"], [/\.yml\b/g, " point YAML"], [/\.yaml\b/g, " point YAML"],
-    [/\.py\b/g, " point PY"], [/\.js\b/g, " point JS"], [/\.json\b/gi, " point JSON"],
-    [/\.sh\b/g, " point SH"], [/\.env\b/g, " point ENV"],
-    [/\bdocker-compose\b/gi, "docker compose"], [/\bkubectl\b/gi, "kioube-control"],
-    [/\bsystemctl\b/gi, "système-control"], [/\bfail2ban\b/gi, "faïl tou banne"],
-    [/\bnginx\b/gi, "ènne-jinnx"], [/\bterraform\.tfstate\b/gi, "téra-forme TF stéte"],
-    [/\/32\b/g, " slash 32"], [/\/24\b/g, " slash 24"], [/\/16\b/g, " slash 16"],
-    [/0\.0\.0\.0\/0/g, "zéro point zéro point zéro point zéro slash zéro"],
-    [/\bCI\/CD\b/gi, "ci aïe ci di"], [/\bt2\.micro\b/g, "T2 maïkro"], [/\bED25519\b/gi, "E D 25519"],
-    [/\bFree Tier\b/gi, "fri tir"],
+    // Extensions de fichiers - prononcer clairement
+    [/\.tf\b/g, " point tf"],
+    [/\.yml\b/g, " point yml"],
+    [/\.yaml\b/g, " point yaml"],
+    [/\.py\b/g, " point py"],
+    [/\.js\b/g, " point js"],
+    [/\.json\b/gi, " point json"],
+    [/\.sh\b/g, " point sh"],
+    [/\.env\b/g, " point env"],
+    [/\.md\b/g, " point md"],
+    
+    // Slash - garder "slash" pas "barre oblique"
+    [/\/32\b/g, " slash 32"],
+    [/\/24\b/g, " slash 24"],
+    [/\/16\b/g, " slash 16"],
+    [/\/0\b/g, " slash 0"],
+    [/\//g, " slash "],
+    
+    // IP addresses - ajouter des pauses
+    [/0\.0\.0\.0/g, "0, 0, 0, 0"],
+    [/(\d+)\.(\d+)\.(\d+)\.(\d+)/g, "$1, $2, $3, $4"],
+    
+    // Commandes composées - séparer pour la clarté
+    [/\bdocker-compose\b/gi, "docker compose"],
+    [/\bfail2ban\b/gi, "fail to ban"],
+    
+    // Sigles - épeler
+    [/\bCI\/CD\b/gi, "CI CD"],
+    [/\bSSH\b/g, "S S H"],
+    [/\bAPI\b/g, "A P I"],
+    [/\bVPC\b/g, "V P C"],
+    [/\bEC2\b/g, "E C 2"],
+    [/\bS3\b/g, "S 3"],
+    [/\bRDS\b/g, "R D S"],
+    [/\bIAM\b/g, "I A M"],
+    [/\bCPU\b/g, "C P U"],
+    [/\bRAM\b/g, "RAM"],
+    [/\bDNS\b/g, "D N S"],
+    [/\bTLS\b/g, "T L S"],
+    [/\bSSL\b/g, "S S L"],
+    [/\bHTTPS?\b/g, "H T T P"],
+    [/\bYAML\b/gi, "YAML"],
+    [/\bJSON\b/gi, "JSON"],
+    [/\bHCL\b/g, "H C L"],
+    [/\bSLI\b/g, "S L I"],
+    [/\bSLO\b/g, "S L O"],
+    [/\bSLA\b/g, "S L A"],
+    
+    // Versions et nombres techniques
+    [/\bt2\.micro\b/gi, "t2 micro"],
+    [/\bED25519\b/gi, "ED 25519"],
+    
+    // Nettoyage
     [/\s+/g, " "],
   ];
+  
   for (const [p, r] of rep) t = t.replace(p, r);
   return t.trim();
 }
@@ -263,22 +183,51 @@ export default function App() {
   useEffect(() => { sectionRef.current = currentSection; }, [currentSection]);
 
   // ── Voice loading ──────────────────────────────────────────────────────────
+  // Priorité : Google > Microsoft > Autres voix de haute qualité > Voix locales
   useEffect(() => {
     const synth = synthRef.current;
     const load = () => {
       const all = synth.getVoices();
       if (!all.length) return;
-      const fr = all.filter(v => v.lang?.toLowerCase().startsWith("fr"));
+      
+      // Filtrer les voix françaises (exclure fr-CA)
+      const fr = all.filter(v => 
+        v.lang?.toLowerCase().startsWith("fr") && 
+        !v.lang?.toLowerCase().includes("ca")
+      );
       const pool = fr.length ? fr : all;
       setVoices(pool);
+      
       setSelectedVoice(prev => {
         if (prev) return prev;
+        
+        // Trouver la meilleure voix disponible
+        // 1. Google FR (meilleure qualité sur Chrome)
+        const googleFR = pool.find(v => 
+          v.name.toLowerCase().includes("google") && v.lang === "fr-FR"
+        );
+        if (googleFR) return googleFR;
+        
+        // 2. Microsoft Neural/Online (haute qualité)
+        const microsoftNeural = pool.find(v => 
+          (v.name.toLowerCase().includes("microsoft") || v.name.toLowerCase().includes("neural")) &&
+          v.lang === "fr-FR"
+        );
+        if (microsoftNeural) return microsoftNeural;
+        
+        // 3. Voix en ligne (généralement meilleure qualité)
+        const onlineFR = pool.find(v => !v.localService && v.lang === "fr-FR");
+        if (onlineFR) return onlineFR;
+        
+        // 4. Sur Android, préférer voix locale pour éviter latence
         if (IS_ANDROID) {
           return pool.find(v => v.localService && v.lang === "fr-FR")
               || pool.find(v => v.localService)
               || pool.find(v => v.lang === "fr-FR")
               || pool[0];
         }
+        
+        // 5. Fallback
         return pool.find(v => v.lang === "fr-FR") || pool[0];
       });
     };
