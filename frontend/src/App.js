@@ -71,16 +71,144 @@ function chunkText(text) {
 function transformTextForAudio(text) {
   if (!text) return "";
   let t = text;
+  
+  // Transcriptions phonétiques pour les termes anglais courants (prononciation française naturelle)
+  const englishTerms = [
+    // DevOps & Cloud
+    [/\bcloud\b/gi, "claoude"],
+    [/\bpipeline\b/gi, "païpe-laïne"],
+    [/\bworkflow\b/gi, "weurk-flo"],
+    [/\bdeployment\b/gi, "di-ploï-mennte"],
+    [/\bcontainer\b/gi, "konne-té-neur"],
+    [/\bcluster\b/gi, "kleusteur"],
+    [/\bnode\b/gi, "nod"],
+    [/\bpod\b/gi, "pod"],
+    [/\bimage\b/gi, "i-mage"],
+    [/\bregistry\b/gi, "rè-jis-tri"],
+    [/\bbuild\b/gi, "bilde"],
+    [/\bpush\b/gi, "pouche"],
+    [/\bpull\b/gi, "poule"],
+    [/\brollback\b/gi, "rol-bak"],
+    [/\brolling update\b/gi, "rolingue eup-déte"],
+    [/\bscaling\b/gi, "skélingue"],
+    [/\bautoscaling\b/gi, "oto-skélingue"],
+    [/\bload balancer\b/gi, "lod ba-lan-ceur"],
+    [/\bproxy\b/gi, "proksi"],
+    [/\breverse proxy\b/gi, "ri-veurse proksi"],
+    [/\bgateway\b/gi, "guéte-wé"],
+    [/\bfirewall\b/gi, "faïeur-wol"],
+    [/\bbackup\b/gi, "bak-eup"],
+    [/\brestore\b/gi, "ri-stor"],
+    [/\bsnapshot\b/gi, "snape-chote"],
+    [/\bstaging\b/gi, "sté-djingue"],
+    [/\bproduction\b/gi, "pro-deuk-cheune"],
+    
+    // Git & CI/CD
+    [/\bcommit\b/gi, "ko-mite"],
+    [/\bbranch\b/gi, "brantche"],
+    [/\bmerge\b/gi, "meurge"],
+    [/\brebase\b/gi, "ri-béze"],
+    [/\bcheckout\b/gi, "tchèk-aoute"],
+    [/\brepository\b/gi, "ri-pozi-tori"],
+    [/\brepo\b/gi, "ri-po"],
+    [/\btrigger\b/gi, "tri-gueur"],
+    [/\brunner\b/gi, "reu-neur"],
+    [/\bjob\b/gi, "djob"],
+    [/\bstep\b/gi, "stèpe"],
+    [/\bartifact\b/gi, "ar-ti-fakt"],
+    
+    // Infrastructure
+    [/\bprovider\b/gi, "pro-vaï-deur"],
+    [/\binstance\b/gi, "inne-stance"],
+    [/\bbucket\b/gi, "beu-kète"],
+    [/\bsubnet\b/gi, "seub-nète"],
+    [/\bsecurity group\b/gi, "si-kiou-ri-ti groupe"],
+    [/\bkey pair\b/gi, "ki père"],
+    [/\bstateful\b/gi, "stéte-foule"],
+    [/\bstateless\b/gi, "stéte-lèsse"],
+    [/\bidempotent\b/gi, "i-demm-po-tente"],
+    [/\bplaybook\b/gi, "plé-bouke"],
+    [/\binventory\b/gi, "inne-venne-tori"],
+    [/\btemplate\b/gi, "temm-pléte"],
+    [/\bmodule\b/gi, "mo-dioule"],
+    [/\bresource\b/gi, "ri-sorce"],
+    [/\boutput\b/gi, "aout-poute"],
+    [/\bstate\b/gi, "stéte"],
+    [/\block\b/gi, "loke"],
+    
+    // Monitoring
+    [/\bmonitoring\b/gi, "mo-ni-to-ringue"],
+    [/\bdashboard\b/gi, "dache-borde"],
+    [/\balert\b/gi, "a-leurte"],
+    [/\bscrape\b/gi, "skrépe"],
+    [/\bmetric\b/gi, "mé-trik"],
+    [/\bquery\b/gi, "kouéri"],
+    [/\bthroughput\b/gi, "troue-poute"],
+    [/\blatency\b/gi, "lé-tenn-ci"],
+    [/\buptime\b/gi, "eup-taïme"],
+    [/\bdowntime\b/gi, "daoun-taïme"],
+    [/\berror budget\b/gi, "éreur beu-djète"],
+    
+    // Sécurité
+    [/\bbrute force\b/gi, "broute force"],
+    [/\bhardening\b/gi, "ar-de-ningue"],
+    [/\baudit\b/gi, "o-dite"],
+    [/\btoken\b/gi, "to-keune"],
+    [/\bsecret\b/gi, "si-krète"],
+    [/\bcredentials\b/gi, "kré-denn-chals"],
+    [/\bvault\b/gi, "volte"],
+    
+    // Agile & Dev
+    [/\bsprint\b/gi, "sprinnte"],
+    [/\bbacklog\b/gi, "bak-log"],
+    [/\buser story\b/gi, "you-zeur stori"],
+    [/\bdefinition of done\b/gi, "dé-fi-ni-cheune of done"],
+    [/\bstandup\b/gi, "stannd-eup"],
+    [/\bdaily\b/gi, "dé-li"],
+    [/\bfeature\b/gi, "fi-tcheur"],
+    [/\bbug\b/gi, "beugue"],
+    [/\bfix\b/gi, "fikse"],
+    [/\bworkaround\b/gi, "weurk-a-raound"],
+    [/\bdeprecated\b/gi, "dé-pri-ké-ted"],
+    [/\boverhead\b/gi, "o-veur-hèd"],
+    [/\bupstream\b/gi, "eup-strim"],
+    [/\bdownstream\b/gi, "daoun-strim"],
+    
+    // Divers tech
+    [/\bshebang\b/gi, "chi-bangue"],
+    [/\bwildcard\b/gi, "waïld-kard"],
+    [/\btimeout\b/gi, "taïme-aoute"],
+    [/\bretry\b/gi, "ri-traï"],
+    [/\bcache\b/gi, "cache"],
+    [/\blayer\b/gi, "lé-yeur"],
+    [/\bhandler\b/gi, "ann-dleur"],
+    [/\bcallback\b/gi, "kol-bak"],
+    [/\bendpoint\b/gi, "ènnd-poïnnte"],
+    [/\bpayload\b/gi, "pé-lod"],
+    [/\bheader\b/gi, "hè-deur"],
+    [/\bbody\b/gi, "bo-di"],
+    [/\brequest\b/gi, "ri-kouèste"],
+    [/\bresponse\b/gi, "ri-sponze"],
+    [/\bstatus code\b/gi, "sta-teusse code"],
+    [/\bhealthcheck\b/gi, "helth-tchèk"],
+    [/\bhealth check\b/gi, "helth tchèk"],
+  ];
+  
+  // Appliquer les transcriptions phonétiques anglaises
+  for (const [p, r] of englishTerms) t = t.replace(p, r);
+  
+  // Transformations techniques existantes
   const rep = [
     [/\.tf\b/g, " point TF"], [/\.yml\b/g, " point YAML"], [/\.yaml\b/g, " point YAML"],
     [/\.py\b/g, " point PY"], [/\.js\b/g, " point JS"], [/\.json\b/gi, " point JSON"],
     [/\.sh\b/g, " point SH"], [/\.env\b/g, " point ENV"],
-    [/\bdocker-compose\b/gi, "docker compose"], [/\bkubectl\b/gi, "kube control"],
-    [/\bsystemctl\b/gi, "system control"], [/\bfail2ban\b/gi, "fail 2 ban"],
-    [/\bnginx\b/gi, "engine X"], [/\bterraform\.tfstate\b/gi, "terraform TF state"],
+    [/\bdocker-compose\b/gi, "docker compose"], [/\bkubectl\b/gi, "kioube-control"],
+    [/\bsystemctl\b/gi, "système-control"], [/\bfail2ban\b/gi, "faïl tou banne"],
+    [/\bnginx\b/gi, "ènne-jinnx"], [/\bterraform\.tfstate\b/gi, "téra-forme TF stéte"],
     [/\/32\b/g, " slash 32"], [/\/24\b/g, " slash 24"], [/\/16\b/g, " slash 16"],
     [/0\.0\.0\.0\/0/g, "zéro point zéro point zéro point zéro slash zéro"],
-    [/\bCI\/CD\b/gi, "CI CD"], [/\bt2\.micro\b/g, "T2 micro"], [/\bED25519\b/gi, "ED 25519"],
+    [/\bCI\/CD\b/gi, "ci aïe ci di"], [/\bt2\.micro\b/g, "T2 maïkro"], [/\bED25519\b/gi, "E D 25519"],
+    [/\bFree Tier\b/gi, "fri tir"],
     [/\s+/g, " "],
   ];
   for (const [p, r] of rep) t = t.replace(p, r);
