@@ -261,6 +261,15 @@ export default function App() {
 
   // ── Block text ─────────────────────────────────────────────────────────────
   const getBlockText = useCallback((block) => {
+    // Special handling for tool_card type
+    if (block.type === "tool_card") {
+      return `Outil : ${block.tool}. ` +
+             `Analogie : ${block.analogy}. ` +
+             `Ce que ça fait : ${block.description}. ` +
+             `Pourquoi c'est utile : ${block.why_useful}. ` +
+             `Lien suivant : ${block.link_next}`;
+    }
+    
     let t = "";
     if (block.title)    t += block.title + ". ";
     if (block.question) t += block.question + " ";
