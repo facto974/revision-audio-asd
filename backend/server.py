@@ -11,6 +11,7 @@ import io
 import tempfile
 import edge_tts
 import asyncio
+import pyttsx3
 from pathlib import Path
 from pydantic import BaseModel, Field, ConfigDict
 from typing import List, Optional, Dict, Any
