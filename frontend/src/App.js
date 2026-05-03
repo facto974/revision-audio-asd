@@ -255,58 +255,60 @@ export default function App() {
         return;
       }
       
+      // Mots-clés pour identifier le genre
+      const maleKeywords = ['male', 'homme', 'thomas', 'pierre', 'paul', 'henri', 'claude', 'alain', 'jacques', 'olivier', 'luca', 'mathieu', 'lucas'];
+      const femaleKeywords = ['female', 'femme', 'amelie', 'amélie', 'marie', 'denise', 'lea', 'léa', 'celine', 'céline', 'aurelie', 'aurélie', 'virginie', 'sophie', 'julie', 'audrey', 'hortense', 'caroline'];
+      
+      const isMaleVoice = (v) => maleKeywords.some(k => v.name.toLowerCase().includes(k));
+      const isFemaleVoice = (v) => femaleKeywords.some(k => v.name.toLowerCase().includes(k));
+      
       // Trouver la meilleure voix homme et femme
-      const findBestVoice = (gender) => {
-        const genderKeywords = gender === 'male' 
-          ? ['male', 'homme', 'thomas', 'pierre', 'paul', 'henri', 'claude']
-          : ['female', 'femme', 'amelie', 'marie', 'denise', 'lea', 'celine'];
+      const findBestVoice = (isMale) => {
+        const checkGender = isMale ? isMaleVoice : isFemaleVoice;
         
         // 1. Google (meilleure qualité)
-        let voice = frVoices.find(v => 
-          v.name.toLowerCase().includes('google') &&
-          genderKeywords.some(k => v.name.toLowerCase().includes(k))
-        );
-        if (voice) return voice;
+        let voice = frVoices.find(v => v.name.toLowerCase().includes('google') && checkGender(v));
+        if (voice) return { voice, gender: isMale ? 'male' : 'female' };
         
         // 2. Microsoft
-        voice = frVoices.find(v => 
-          v.name.toLowerCase().includes('microsoft') &&
-          genderKeywords.some(k => v.name.toLowerCase().includes(k))
-        );
-        if (voice) return voice;
+        voice = frVoices.find(v => v.name.toLowerCase().includes('microsoft') && checkGender(v));
+        if (voice) return { voice, gender: isMale ? 'male' : 'female' };
         
         // 3. Any with gender keyword
-        voice = frVoices.find(v => 
-          genderKeywords.some(k => v.name.toLowerCase().includes(k))
-        );
-        if (voice) return voice;
+        voice = frVoices.find(v => checkGender(v));
+        if (voice) return { voice, gender: isMale ? 'male' : 'female' };
         
         return null;
       };
       
-      const maleVoice = findBestVoice('male');
-      const femaleVoice = findBestVoice('female');
+      const maleResult = findBestVoice(true);
+      const femaleResult = findBestVoice(false);
       
-      // Build final voice list (max 2)
+      // Build final voice list with gender info
       const finalVoices = [];
-      if (maleVoice) finalVoices.push(maleVoice);
-      if (femaleVoice && femaleVoice !== maleVoice) finalVoices.push(femaleVoice);
+      if (maleResult) finalVoices.push({ ...maleResult.voice, gender: 'male' });
+      if (femaleResult && femaleResult.voice !== maleResult?.voice) {
+        finalVoices.push({ ...femaleResult.voice, gender: 'female' });
+      }
       
-      // Fallback if no gender-specific found
+      // Fallback if no gender-specific found - take first 2 voices
       if (finalVoices.length === 0) {
         const google = frVoices.find(v => v.name.toLowerCase().includes('google'));
         const microsoft = frVoices.find(v => v.name.toLowerCase().includes('microsoft'));
-        if (google) finalVoices.push(google);
-        if (microsoft && microsoft !== google) finalVoices.push(microsoft);
-        if (finalVoices.length === 0) finalVoices.push(...frVoices.slice(0, 2));
+        if (google) finalVoices.push({ ...google, gender: 'unknown' });
+        if (microsoft && microsoft !== google) finalVoices.push({ ...microsoft, gender: 'unknown' });
+        if (finalVoices.length === 0) {
+          frVoices.slice(0, 2).forEach((v, i) => finalVoices.push({ ...v, gender: i === 0 ? 'male' : 'female' }));
+        }
       }
       
       setVoices(finalVoices);
       
       // Set default: prefer male voice
       setSelectedVoice(prev => {
-        if (prev && finalVoices.includes(prev)) return prev;
-        return maleVoice || finalVoices[0];
+        if (prev && finalVoices.some(v => v.name === prev.name)) return prev;
+        const male = finalVoices.find(v => v.gender === 'male');
+        return male || finalVoices[0];
       });
     };
     
@@ -702,14 +704,7 @@ export default function App() {
               <SelectContent className="z-[70]">
                 {voices.map(v => (
                   <SelectItem key={v.name} value={v.name}>
-                    {v.name.toLowerCase().includes('male') || 
-                     v.name.toLowerCase().includes('homme') ||
-                     v.name.toLowerCase().includes('thomas') ||
-                     v.name.toLowerCase().includes('pierre') ||
-                     v.name.toLowerCase().includes('henri') ||
-                     v.name.toLowerCase().includes('claude')
-                      ? "🎙️ Homme" 
-                      : "🎙️ Femme"}
+                    {v.gender === 'male' ? "🎙️ Homme" : v.gender === 'female' ? "🎙️ Femme" : "🎙️ Voix"}
                   </SelectItem>
                 ))}
               </SelectContent>
