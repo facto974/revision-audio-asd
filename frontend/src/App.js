@@ -237,6 +237,8 @@ export default function App() {
   useEffect(() => { sectionRef.current = currentSection; }, [currentSection]);
 
   // ── Voice loading - Only best quality voices ────────────────────────────────
+  const [voiceGenders, setVoiceGenders] = useState({});
+  
   useEffect(() => {
     const synth = synthRef.current;
     const load = () => {
@@ -284,30 +286,46 @@ export default function App() {
       const maleResult = findBestVoice(true);
       const femaleResult = findBestVoice(false);
       
-      // Build final voice list with gender info
+      // Build final voice list (keep original voice objects!)
       const finalVoices = [];
-      if (maleResult) finalVoices.push({ ...maleResult.voice, gender: 'male' });
+      const genders = {};
+      
+      if (maleResult) {
+        finalVoices.push(maleResult.voice);
+        genders[maleResult.voice.name] = 'male';
+      }
       if (femaleResult && femaleResult.voice !== maleResult?.voice) {
-        finalVoices.push({ ...femaleResult.voice, gender: 'female' });
+        finalVoices.push(femaleResult.voice);
+        genders[femaleResult.voice.name] = 'female';
       }
       
       // Fallback if no gender-specific found - take first 2 voices
       if (finalVoices.length === 0) {
         const google = frVoices.find(v => v.name.toLowerCase().includes('google'));
         const microsoft = frVoices.find(v => v.name.toLowerCase().includes('microsoft'));
-        if (google) finalVoices.push({ ...google, gender: 'unknown' });
-        if (microsoft && microsoft !== google) finalVoices.push({ ...microsoft, gender: 'unknown' });
+        if (google) {
+          finalVoices.push(google);
+          genders[google.name] = 'unknown';
+        }
+        if (microsoft && microsoft !== google) {
+          finalVoices.push(microsoft);
+          genders[microsoft.name] = 'unknown';
+        }
         if (finalVoices.length === 0) {
-          frVoices.slice(0, 2).forEach((v, i) => finalVoices.push({ ...v, gender: i === 0 ? 'male' : 'female' }));
+          frVoices.slice(0, 2).forEach((v, i) => {
+            finalVoices.push(v);
+            genders[v.name] = i === 0 ? 'male' : 'female';
+          });
         }
       }
       
       setVoices(finalVoices);
+      setVoiceGenders(genders);
       
       // Set default: prefer male voice
       setSelectedVoice(prev => {
         if (prev && finalVoices.some(v => v.name === prev.name)) return prev;
-        const male = finalVoices.find(v => v.gender === 'male');
+        const male = finalVoices.find(v => genders[v.name] === 'male');
         return male || finalVoices[0];
       });
     };
@@ -704,7 +722,7 @@ export default function App() {
               <SelectContent className="z-[70]">
                 {voices.map(v => (
                   <SelectItem key={v.name} value={v.name}>
-                    {v.gender === 'male' ? "🎙️ Homme" : v.gender === 'female' ? "🎙️ Femme" : "🎙️ Voix"}
+                    {voiceGenders[v.name] === 'male' ? "🎙️ Homme" : voiceGenders[v.name] === 'female' ? "🎙️ Femme" : "🎙️ Voix"}
                   </SelectItem>
                 ))}
               </SelectContent>
