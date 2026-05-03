@@ -72,36 +72,80 @@ function transformTextForAudio(text) {
   if (!text) return "";
   let t = text;
   
-  // Seulement les transformations essentielles - garder les termes anglais tels quels
-  // car les voix modernes (Google, Microsoft) les prononcent correctement en anglais
+  // Transformations pour une prononciation naturelle avec voix française
+  // Objectif : aider la voix FR à prononcer l'anglais sans sonner artificiel
   const rep = [
-    // Extensions de fichiers - prononcer clairement
-    [/\.tf\b/g, " point tf"],
-    [/\.yml\b/g, " point yml"],
-    [/\.yaml\b/g, " point yaml"],
-    [/\.py\b/g, " point py"],
-    [/\.js\b/g, " point js"],
-    [/\.json\b/gi, " point json"],
-    [/\.sh\b/g, " point sh"],
-    [/\.env\b/g, " point env"],
-    [/\.md\b/g, " point md"],
+    // === OUTILS & TECHNOLOGIES ===
+    // Prononciations qui posent problème avec voix FR
+    [/\bKubernetes\b/gi, "Kubernetisse"],
+    [/\bDocker\b/gi, "Dokeur"],
+    [/\bTerraform\b/gi, "Terraformme"],
+    [/\bAnsible\b/gi, "Ansibole"],
+    [/\bPrometheus\b/gi, "Prométéusse"],
+    [/\bGrafana\b/gi, "Grafana"],
+    [/\bNginx\b/gi, "Endjinnex"],
+    [/\bGitHub\b/gi, "Guiteub"],
+    [/\bGit\b/g, "Guite"],
+    [/\bJenkins\b/gi, "Djenkinss"],
+    [/\bStreamlit\b/gi, "Strimlite"],
+    [/\bHashiCorp\b/gi, "Hachicorp"],
+    [/\bVault\b/gi, "Volte"],
     
-    // Slash - garder "slash" pas "barre oblique"
+    // === CONCEPTS DEVOPS ===
+    [/\bpipeline\b/gi, "païpe-laïne"],
+    [/\bcontainer\b/gi, "conteneur"],
+    [/\bcontainers\b/gi, "conteneurs"],
+    [/\bcluster\b/gi, "clusteur"],
+    [/\bdeployment\b/gi, "déploiement"],
+    [/\bworkflow\b/gi, "workflow"],
+    [/\brollback\b/gi, "rollback"],
+    [/\brolling update\b/gi, "rolling update"],
+    [/\bload balancer\b/gi, "load balanceur"],
+    [/\bfirewall\b/gi, "firewall"],
+    [/\bgateway\b/gi, "gateway"],
+    [/\bproxy\b/gi, "proxy"],
+    [/\bbackup\b/gi, "backup"],
+    [/\bcache\b/gi, "cache"],
+    [/\bpod\b/gi, "pod"],
+    [/\bpods\b/gi, "pods"],
+    [/\bnode\b/gi, "node"],
+    [/\bnodes\b/gi, "nodes"],
+    
+    // === GIT ===
+    [/\bcommit\b/gi, "commite"],
+    [/\bcommits\b/gi, "comites"],
+    [/\bbranch\b/gi, "branche"],
+    [/\bmerge\b/gi, "merge"],
+    [/\bpush\b/gi, "pouche"],
+    [/\bpull\b/gi, "poule"],
+    
+    // === FICHIERS & EXTENSIONS ===
+    [/\.tf\b/g, " point TF"],
+    [/\.yml\b/g, " point YAML"],
+    [/\.yaml\b/g, " point YAML"],
+    [/\.py\b/g, " point PY"],
+    [/\.js\b/g, " point JS"],
+    [/\.json\b/gi, " point JSON"],
+    [/\.sh\b/g, " point SH"],
+    [/\.env\b/g, " point ENV"],
+    [/\.md\b/g, " point MD"],
+    [/\bDockerfile\b/gi, "Dokeur file"],
+    [/\bplaybook\b/gi, "playbook"],
+    
+    // === RÉSEAU ===
     [/\/32\b/g, " slash 32"],
     [/\/24\b/g, " slash 24"],
     [/\/16\b/g, " slash 16"],
     [/\/0\b/g, " slash 0"],
-    [/\//g, " slash "],
+    [/0\.0\.0\.0/g, "0.0.0.0"],
     
-    // IP addresses - ajouter des pauses
-    [/0\.0\.0\.0/g, "0, 0, 0, 0"],
-    [/(\d+)\.(\d+)\.(\d+)\.(\d+)/g, "$1, $2, $3, $4"],
+    // === COMMANDES ===
+    [/\bdocker-compose\b/gi, "dokeur compose"],
+    [/\bfail2ban\b/gi, "fail 2 ban"],
+    [/\bkubectl\b/gi, "kioub control"],
+    [/\bsystemctl\b/gi, "système control"],
     
-    // Commandes composées - séparer pour la clarté
-    [/\bdocker-compose\b/gi, "docker compose"],
-    [/\bfail2ban\b/gi, "fail to ban"],
-    
-    // Sigles - épeler
+    // === SIGLES (épelés) ===
     [/\bCI\/CD\b/gi, "CI CD"],
     [/\bSSH\b/g, "S S H"],
     [/\bAPI\b/g, "A P I"],
@@ -115,19 +159,29 @@ function transformTextForAudio(text) {
     [/\bDNS\b/g, "D N S"],
     [/\bTLS\b/g, "T L S"],
     [/\bSSL\b/g, "S S L"],
-    [/\bHTTPS?\b/g, "H T T P"],
+    [/\bHTTPS\b/g, "H T T P S"],
+    [/\bHTTP\b/g, "H T T P"],
     [/\bYAML\b/gi, "YAML"],
     [/\bJSON\b/gi, "JSON"],
     [/\bHCL\b/g, "H C L"],
     [/\bSLI\b/g, "S L I"],
     [/\bSLO\b/g, "S L O"],
     [/\bSLA\b/g, "S L A"],
+    [/\bPromQL\b/gi, "Prom Q L"],
     
-    // Versions et nombres techniques
-    [/\bt2\.micro\b/gi, "t2 micro"],
-    [/\bED25519\b/gi, "ED 25519"],
+    // === DIVERS ===
+    [/\bt2\.micro\b/gi, "T2 micro"],
+    [/\bED25519\b/gi, "E D 25519"],
+    [/\bFree Tier\b/gi, "Free Tier"],
+    [/\bbucket\b/gi, "bucket"],
+    [/\bsubnet\b/gi, "subnet"],
+    [/\binstance\b/gi, "instance"],
+    [/\btrigger\b/gi, "trigger"],
+    [/\bsprint\b/gi, "sprint"],
+    [/\bbacklog\b/gi, "backlog"],
+    [/\bstandup\b/gi, "stand up"],
     
-    // Nettoyage
+    // === NETTOYAGE ===
     [/\s+/g, " "],
   ];
   
