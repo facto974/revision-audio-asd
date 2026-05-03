@@ -161,6 +161,7 @@ export default function App() {
   const [sidebarOpen,     setSidebarOpen]     = useState(false);
   const [progress,        setProgress]        = useState(0);
   const [mode,            setMode]            = useState("audio");
+  const [isLoadingAudio, setIsLoadingAudio] = useState(false);
   const [ttsMode,         setTtsMode]         = useState("edge"); // "edge" (natural) or "browser"
   const [edgeVoices,      setEdgeVoices]      = useState([]);
   const [selectedEdgeVoice, setSelectedEdgeVoice] = useState("fr-FR-HenriNeural");
@@ -264,77 +265,104 @@ export default function App() {
     return () => { try { synth.cancel(); } catch { /* ignore */ } };
   }, []);
 
-  // ── speakText ──────────────────────────────────────────────────────────────
-  //
-  // Android Chrome constraints solved here:
-  //
-  //   [A] cancel() is ASYNCHRONOUS on Android.
-  //       → Always wait ≥ 100 ms after cancel() before queuing new utterances.
-  //
-  //   [B] volume=0 "primer" no longer unlocks audio in Chrome 120+.
-  //       → On the very first call, speak a real (volume=0.01) primer utterance,
-  //         wait for its onend, THEN queue the real chunks. This satisfies the
-  //         "user gesture required" requirement reliably.
-  //
-  //   [C] Long text (> ~130 chars on Android) silently cuts off.
-  //       → chunkText() splits into short pieces before queuing.
-  //
-  //   [D] Stale callbacks from a cancelled call firing and calling setIsPlaying.
-  //       → cancelToken (gToken) guards every onend/onerror.
-  //
-  //   [E] selectedVoice / speed state captured at call time via refs.
-  //       → voiceRef / speedRef always hold the latest values.
-  //
-  const speakText = useCallback((rawText, onDone) => {
-    const synth  = synthRef.current;
-    const voice  = voiceRef.current;
-    const rate   = speedRef.current;
-    const token  = ++gToken;
-    const stale  = () => token !== gToken;
-
-    synth.cancel(); // [A] cancel first — but must wait before re-queuing
-
+  // ── speakText using Edge TTS (high quality neural voice) ──────────────────
+  const speakText = useCallback((rawText, onDone, sectionId, blockIndex) => {
+    const token = ++gToken;
+    const stale = () => token !== gToken;
+    
+    // Stop any current audio
+    if (audioRef.current) {
+      audioRef.current.pause();
+      audioRef.current = null;
+    }
+    
+    const playAudio = async () => {
+      if (stale()) return;
+      
+      try {
+        setIsLoadingAudio(true);
+        const API_BASE = process.env.REACT_APP_BACKEND_URL || "";
+        const voice = selectedEdgeVoice;
+        const rate = speedRef.current < 1 ? `-${Math.round((1 - speedRef.current) * 50)}%` : `+${Math.round((speedRef.current - 1) * 30)}%`;
+        
+        // Use block endpoint if we have section/block info, otherwise fallback
+        let audioUrl;
+        if (sectionId !== undefined && blockIndex !== undefined) {
+          audioUrl = `${API_BASE}/api/tts/block/${sectionId}/${blockIndex}?voice=${voice}&rate=${rate}`;
+        } else {
+          // Fallback to direct text endpoint
+          const text = encodeURIComponent(transformTextForAudio(rawText));
+          audioUrl = `${API_BASE}/api/tts/speak?text=${text}&voice=${voice}&rate=${rate}`;
+        }
+        
+        const audio = new Audio(audioUrl);
+        audioRef.current = audio;
+        
+        audio.onloadstart = () => {
+          if (!stale()) setIsPlaying(true);
+        };
+        
+        audio.onended = () => {
+          if (stale()) return;
+          setIsPlaying(false);
+          setIsLoadingAudio(false);
+          onDone?.();
+        };
+        
+        audio.onerror = (e) => {
+          console.warn("Audio error:", e);
+          if (stale()) return;
+          setIsPlaying(false);
+          setIsLoadingAudio(false);
+          // Fallback to browser TTS
+          fallbackBrowserTTS(rawText, onDone);
+        };
+        
+        audio.oncanplay = () => {
+          setIsLoadingAudio(false);
+        };
+        
+        await audio.play();
+        
+      } catch (err) {
+        console.warn("Edge TTS error:", err);
+        setIsLoadingAudio(false);
+        // Fallback to browser TTS
+        fallbackBrowserTTS(rawText, onDone);
+      }
+    };
+    
+    playAudio();
+  }, [selectedEdgeVoice]);
+  
+  // Fallback to browser TTS if Edge TTS fails
+  const fallbackBrowserTTS = useCallback((rawText, onDone) => {
+    const synth = synthRef.current;
+    const voice = voiceRef.current;
+    const rate = speedRef.current;
+    
+    synth.cancel();
+    
     const chunks = chunkText(transformTextForAudio(rawText));
     if (!chunks.length) { onDone?.(); return; }
-
-    const queueAll = () => {
-      if (stale()) return;
+    
+    setTimeout(() => {
       chunks.forEach((chunk, idx) => {
-        const u      = buildUtterance(chunk, voice, rate);
+        const u = buildUtterance(chunk, voice, rate);
         const isLast = idx === chunks.length - 1;
-
-        u.onstart = () => { if (!stale()) setIsPlaying(true); };
-
+        
+        u.onstart = () => setIsPlaying(true);
         u.onend = () => {
-          if (stale()) return;
           if (isLast) { setIsPlaying(false); onDone?.(); }
         };
-
-        u.onerror = (e) => {
-          if (e?.error === "canceled" || e?.error === "interrupted") return;
-          if (stale()) return;
-          console.warn("TTS chunk", idx, e?.error);
+        u.onerror = () => {
           if (isLast) { setIsPlaying(false); onDone?.(); }
         };
-
-        try { synth.speak(u); } catch (err) { console.warn("speak() threw:", err); }
+        
+        synth.speak(u);
       });
-    };
-
-    if (IS_ANDROID && !primedRef.current) {
-      // [B] First user interaction on Android: unlock audio with a real primer
-      primedRef.current = true;
-      const primer  = buildUtterance(".", voice, 1);
-      primer.volume = 0.01;
-      const afterPrimer = () => setTimeout(queueAll, 80);
-      primer.onend  = afterPrimer;
-      primer.onerror = afterPrimer;
-      setTimeout(() => { if (!stale()) synth.speak(primer); }, 100); // [A]
-    } else {
-      // [A] Wait for cancel() to settle, then queue all chunks synchronously
-      setTimeout(queueAll, IS_ANDROID ? 110 : 30);
-    }
-  }, []); // stable — reads everything via refs, no deps needed
+    }, 50);
+  }, []);
 
   // ── Block text ─────────────────────────────────────────────────────────────
   const getBlockText = useCallback((block) => {
@@ -388,11 +416,9 @@ export default function App() {
 
     speakText(text, () => {
       if (continuousRef.current) {
-        // Small inter-block pause. On Android 400 ms gives the engine
-        // time to clear its queue before the next cancel()+speak cycle.
-        setTimeout(() => playFrom(idx + 1), IS_ANDROID ? 450 : 270);
+        setTimeout(() => playFrom(idx + 1), 300);
       }
-    });
+    }, section.id, idx);
   }, [getBlockText, speakText, markSectionComplete]);
 
   // ── Handlers ───────────────────────────────────────────────────────────────
@@ -400,12 +426,18 @@ export default function App() {
     continuousRef.current   = false;
     currentIndexRef.current = index;
     setCurrentBlockIndex(index);
-    setProgress(((index + 1) / sectionRef.current.content.length) * 100);
-    speakText(getBlockText(sectionRef.current.content[index]), () => {});
+    const section = sectionRef.current;
+    setProgress(((index + 1) / section.content.length) * 100);
+    speakText(getBlockText(section.content[index]), () => {}, section.id, index);
   }, [speakText, getBlockText]);
 
   const togglePlay = useCallback(() => {
     if (isPlaying) {
+      // Stop Edge TTS audio
+      if (audioRef.current) {
+        audioRef.current.pause();
+        audioRef.current = null;
+      }
       synthRef.current.cancel();
       continuousRef.current = false;
       setIsPlaying(false);
@@ -416,6 +448,11 @@ export default function App() {
   }, [isPlaying, currentBlockIndex, playFrom]);
 
   const stopPlayback = useCallback(() => {
+    // Stop Edge TTS audio
+    if (audioRef.current) {
+      audioRef.current.pause();
+      audioRef.current = null;
+    }
     synthRef.current.cancel();
     continuousRef.current   = false;
     currentIndexRef.current = 0;
@@ -642,12 +679,11 @@ export default function App() {
         <div className="player-settings">
           <div className="setting-group">
             <Volume2 size={16} className="setting-icon" />
-            <Select value={selectedVoice?.name || ""} onValueChange={changeVoice}>
+            <Select value={selectedEdgeVoice} onValueChange={setSelectedEdgeVoice}>
               <SelectTrigger className="voice-select"><SelectValue placeholder="Voix" /></SelectTrigger>
               <SelectContent className="z-[70]">
-                {voices.length > 0
-                  ? voices.map(v => <SelectItem key={v.name} value={v.name}>{getShortVoiceName(v)}</SelectItem>)
-                  : <SelectItem value="default">Voix système</SelectItem>}
+                <SelectItem value="fr-FR-HenriNeural">Henri (homme)</SelectItem>
+                <SelectItem value="fr-FR-DeniseNeural">Denise (femme)</SelectItem>
               </SelectContent>
             </Select>
           </div>
