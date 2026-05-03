@@ -161,8 +161,7 @@ export default function App() {
   const [sidebarOpen,     setSidebarOpen]     = useState(false);
   const [progress,        setProgress]        = useState(0);
   const [mode,            setMode]            = useState("audio");
-  const [isLoadingAudio, setIsLoadingAudio] = useState(false);
-  const [ttsMode,         setTtsMode]         = useState("edge"); // "edge" (natural) or "browser"
+  const [ttsMode]         = useState("browser");
   const [edgeVoices,      setEdgeVoices]      = useState([]);
   const [selectedEdgeVoice, setSelectedEdgeVoice] = useState("fr-FR-HenriNeural");
   const [isLoadingAudio,  setIsLoadingAudio]  = useState(false);
@@ -183,8 +182,7 @@ export default function App() {
   useEffect(() => { speedRef.current   = speed;          }, [speed]);
   useEffect(() => { sectionRef.current = currentSection; }, [currentSection]);
 
-  // ── Voice loading ──────────────────────────────────────────────────────────
-  // Priorité : Google > Microsoft > Autres voix de haute qualité > Voix locales
+  // ── Voice loading - Only best quality voices ────────────────────────────────
   useEffect(() => {
     const synth = synthRef.current;
     const load = () => {
@@ -192,46 +190,72 @@ export default function App() {
       if (!all.length) return;
       
       // Filtrer les voix françaises (exclure fr-CA)
-      const fr = all.filter(v => 
+      const frVoices = all.filter(v => 
         v.lang?.toLowerCase().startsWith("fr") && 
         !v.lang?.toLowerCase().includes("ca")
       );
-      const pool = fr.length ? fr : all;
-      setVoices(pool);
       
+      if (!frVoices.length) {
+        setVoices(all.slice(0, 2));
+        setSelectedVoice(all[0]);
+        return;
+      }
+      
+      // Trouver la meilleure voix homme et femme
+      const findBestVoice = (gender) => {
+        const genderKeywords = gender === 'male' 
+          ? ['male', 'homme', 'thomas', 'pierre', 'paul', 'henri', 'claude']
+          : ['female', 'femme', 'amelie', 'marie', 'denise', 'lea', 'celine'];
+        
+        // 1. Google (meilleure qualité)
+        let voice = frVoices.find(v => 
+          v.name.toLowerCase().includes('google') &&
+          genderKeywords.some(k => v.name.toLowerCase().includes(k))
+        );
+        if (voice) return voice;
+        
+        // 2. Microsoft
+        voice = frVoices.find(v => 
+          v.name.toLowerCase().includes('microsoft') &&
+          genderKeywords.some(k => v.name.toLowerCase().includes(k))
+        );
+        if (voice) return voice;
+        
+        // 3. Any with gender keyword
+        voice = frVoices.find(v => 
+          genderKeywords.some(k => v.name.toLowerCase().includes(k))
+        );
+        if (voice) return voice;
+        
+        return null;
+      };
+      
+      const maleVoice = findBestVoice('male');
+      const femaleVoice = findBestVoice('female');
+      
+      // Build final voice list (max 2)
+      const finalVoices = [];
+      if (maleVoice) finalVoices.push(maleVoice);
+      if (femaleVoice && femaleVoice !== maleVoice) finalVoices.push(femaleVoice);
+      
+      // Fallback if no gender-specific found
+      if (finalVoices.length === 0) {
+        const google = frVoices.find(v => v.name.toLowerCase().includes('google'));
+        const microsoft = frVoices.find(v => v.name.toLowerCase().includes('microsoft'));
+        if (google) finalVoices.push(google);
+        if (microsoft && microsoft !== google) finalVoices.push(microsoft);
+        if (finalVoices.length === 0) finalVoices.push(...frVoices.slice(0, 2));
+      }
+      
+      setVoices(finalVoices);
+      
+      // Set default: prefer male voice
       setSelectedVoice(prev => {
-        if (prev) return prev;
-        
-        // Trouver la meilleure voix disponible
-        // 1. Google FR (meilleure qualité sur Chrome)
-        const googleFR = pool.find(v => 
-          v.name.toLowerCase().includes("google") && v.lang === "fr-FR"
-        );
-        if (googleFR) return googleFR;
-        
-        // 2. Microsoft Neural/Online (haute qualité)
-        const microsoftNeural = pool.find(v => 
-          (v.name.toLowerCase().includes("microsoft") || v.name.toLowerCase().includes("neural")) &&
-          v.lang === "fr-FR"
-        );
-        if (microsoftNeural) return microsoftNeural;
-        
-        // 3. Voix en ligne (généralement meilleure qualité)
-        const onlineFR = pool.find(v => !v.localService && v.lang === "fr-FR");
-        if (onlineFR) return onlineFR;
-        
-        // 4. Sur Android, préférer voix locale pour éviter latence
-        if (IS_ANDROID) {
-          return pool.find(v => v.localService && v.lang === "fr-FR")
-              || pool.find(v => v.localService)
-              || pool.find(v => v.lang === "fr-FR")
-              || pool[0];
-        }
-        
-        // 5. Fallback
-        return pool.find(v => v.lang === "fr-FR") || pool[0];
+        if (prev && finalVoices.includes(prev)) return prev;
+        return maleVoice || finalVoices[0];
       });
     };
+    
     load();
     if (synth.onvoiceschanged !== undefined) synth.onvoiceschanged = load;
     const timers = [100, 300, 700, 1500, 3000].map(ms => setTimeout(load, ms));
@@ -265,103 +289,54 @@ export default function App() {
     return () => { try { synth.cancel(); } catch { /* ignore */ } };
   }, []);
 
-  // ── speakText using Edge TTS (high quality neural voice) ──────────────────
-  const speakText = useCallback((rawText, onDone, sectionId, blockIndex) => {
-    const token = ++gToken;
-    const stale = () => token !== gToken;
-    
-    // Stop any current audio
-    if (audioRef.current) {
-      audioRef.current.pause();
-      audioRef.current = null;
-    }
-    
-    const playAudio = async () => {
-      if (stale()) return;
-      
-      try {
-        setIsLoadingAudio(true);
-        const API_BASE = process.env.REACT_APP_BACKEND_URL || "";
-        const voice = selectedEdgeVoice;
-        const rate = speedRef.current < 1 ? `-${Math.round((1 - speedRef.current) * 50)}%` : `+${Math.round((speedRef.current - 1) * 30)}%`;
-        
-        // Use block endpoint if we have section/block info, otherwise fallback
-        let audioUrl;
-        if (sectionId !== undefined && blockIndex !== undefined) {
-          audioUrl = `${API_BASE}/api/tts/block/${sectionId}/${blockIndex}?voice=${voice}&rate=${rate}`;
-        } else {
-          // Fallback to direct text endpoint
-          const text = encodeURIComponent(transformTextForAudio(rawText));
-          audioUrl = `${API_BASE}/api/tts/speak?text=${text}&voice=${voice}&rate=${rate}`;
-        }
-        
-        const audio = new Audio(audioUrl);
-        audioRef.current = audio;
-        
-        audio.onloadstart = () => {
-          if (!stale()) setIsPlaying(true);
-        };
-        
-        audio.onended = () => {
-          if (stale()) return;
-          setIsPlaying(false);
-          setIsLoadingAudio(false);
-          onDone?.();
-        };
-        
-        audio.onerror = (e) => {
-          console.warn("Audio error:", e);
-          if (stale()) return;
-          setIsPlaying(false);
-          setIsLoadingAudio(false);
-          // Fallback to browser TTS
-          fallbackBrowserTTS(rawText, onDone);
-        };
-        
-        audio.oncanplay = () => {
-          setIsLoadingAudio(false);
-        };
-        
-        await audio.play();
-        
-      } catch (err) {
-        console.warn("Edge TTS error:", err);
-        setIsLoadingAudio(false);
-        // Fallback to browser TTS
-        fallbackBrowserTTS(rawText, onDone);
-      }
-    };
-    
-    playAudio();
-  }, [selectedEdgeVoice]);
-  
-  // Fallback to browser TTS if Edge TTS fails
-  const fallbackBrowserTTS = useCallback((rawText, onDone) => {
-    const synth = synthRef.current;
-    const voice = voiceRef.current;
-    const rate = speedRef.current;
-    
+  // ── speakText using Browser TTS ──────────────────────────────────────────
+  const speakText = useCallback((rawText, onDone) => {
+    const synth  = synthRef.current;
+    const voice  = voiceRef.current;
+    const rate   = speedRef.current;
+    const token  = ++gToken;
+    const stale  = () => token !== gToken;
+
     synth.cancel();
-    
+
     const chunks = chunkText(transformTextForAudio(rawText));
     if (!chunks.length) { onDone?.(); return; }
-    
-    setTimeout(() => {
+
+    const queueAll = () => {
+      if (stale()) return;
       chunks.forEach((chunk, idx) => {
-        const u = buildUtterance(chunk, voice, rate);
+        const u      = buildUtterance(chunk, voice, rate);
         const isLast = idx === chunks.length - 1;
-        
-        u.onstart = () => setIsPlaying(true);
+
+        u.onstart = () => { if (!stale()) setIsPlaying(true); };
+
         u.onend = () => {
+          if (stale()) return;
           if (isLast) { setIsPlaying(false); onDone?.(); }
         };
-        u.onerror = () => {
+
+        u.onerror = (e) => {
+          if (e?.error === "canceled" || e?.error === "interrupted") return;
+          if (stale()) return;
+          console.warn("TTS chunk", idx, e?.error);
           if (isLast) { setIsPlaying(false); onDone?.(); }
         };
-        
-        synth.speak(u);
+
+        try { synth.speak(u); } catch (err) { console.warn("speak() threw:", err); }
       });
-    }, 50);
+    };
+
+    if (IS_ANDROID && !primedRef.current) {
+      primedRef.current = true;
+      const primer  = buildUtterance(".", voice, 1);
+      primer.volume = 0.01;
+      const afterPrimer = () => setTimeout(queueAll, 80);
+      primer.onend  = afterPrimer;
+      primer.onerror = afterPrimer;
+      setTimeout(() => { if (!stale()) synth.speak(primer); }, 100);
+    } else {
+      setTimeout(queueAll, IS_ANDROID ? 110 : 30);
+    }
   }, []);
 
   // ── Block text ─────────────────────────────────────────────────────────────
@@ -416,9 +391,9 @@ export default function App() {
 
     speakText(text, () => {
       if (continuousRef.current) {
-        setTimeout(() => playFrom(idx + 1), 300);
+        setTimeout(() => playFrom(idx + 1), IS_ANDROID ? 450 : 270);
       }
-    }, section.id, idx);
+    });
   }, [getBlockText, speakText, markSectionComplete]);
 
   // ── Handlers ───────────────────────────────────────────────────────────────
@@ -426,18 +401,12 @@ export default function App() {
     continuousRef.current   = false;
     currentIndexRef.current = index;
     setCurrentBlockIndex(index);
-    const section = sectionRef.current;
-    setProgress(((index + 1) / section.content.length) * 100);
-    speakText(getBlockText(section.content[index]), () => {}, section.id, index);
+    setProgress(((index + 1) / sectionRef.current.content.length) * 100);
+    speakText(getBlockText(sectionRef.current.content[index]), () => {});
   }, [speakText, getBlockText]);
 
   const togglePlay = useCallback(() => {
     if (isPlaying) {
-      // Stop Edge TTS audio
-      if (audioRef.current) {
-        audioRef.current.pause();
-        audioRef.current = null;
-      }
       synthRef.current.cancel();
       continuousRef.current = false;
       setIsPlaying(false);
@@ -448,11 +417,6 @@ export default function App() {
   }, [isPlaying, currentBlockIndex, playFrom]);
 
   const stopPlayback = useCallback(() => {
-    // Stop Edge TTS audio
-    if (audioRef.current) {
-      audioRef.current.pause();
-      audioRef.current = null;
-    }
     synthRef.current.cancel();
     continuousRef.current   = false;
     currentIndexRef.current = 0;
@@ -679,11 +643,21 @@ export default function App() {
         <div className="player-settings">
           <div className="setting-group">
             <Volume2 size={16} className="setting-icon" />
-            <Select value={selectedEdgeVoice} onValueChange={setSelectedEdgeVoice}>
+            <Select value={selectedVoice?.name || ""} onValueChange={v => setSelectedVoice(voices.find(x => x.name === v))}>
               <SelectTrigger className="voice-select"><SelectValue placeholder="Voix" /></SelectTrigger>
               <SelectContent className="z-[70]">
-                <SelectItem value="fr-FR-HenriNeural">Henri (homme)</SelectItem>
-                <SelectItem value="fr-FR-DeniseNeural">Denise (femme)</SelectItem>
+                {voices.map(v => (
+                  <SelectItem key={v.name} value={v.name}>
+                    {v.name.toLowerCase().includes('male') || 
+                     v.name.toLowerCase().includes('homme') ||
+                     v.name.toLowerCase().includes('thomas') ||
+                     v.name.toLowerCase().includes('pierre') ||
+                     v.name.toLowerCase().includes('henri') ||
+                     v.name.toLowerCase().includes('claude')
+                      ? "🎙️ Homme" 
+                      : "🎙️ Femme"}
+                  </SelectItem>
+                ))}
               </SelectContent>
             </Select>
           </div>
