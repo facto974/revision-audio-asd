@@ -76,7 +76,6 @@ function transformTextForAudio(text) {
   // Objectif : aider la voix FR à prononcer l'anglais sans sonner artificiel
   const rep = [
     // === OUTILS & TECHNOLOGIES ===
-    // Prononciations qui posent problème avec voix FR
     [/\bKubernetes\b/gi, "Kubernetisse"],
     [/\bDocker\b/gi, "Dokeur"],
     [/\bTerraform\b/gi, "Terraformme"],
@@ -363,6 +362,49 @@ export default function App() {
     return () => { try { synth.cancel(); } catch { /* ignore */ } };
   }, []);
 
+  // ── Wake Lock : empêche l'écran de s'éteindre pendant la lecture ───────────
+  // Indispensable pour l'usage en voiture : sans ça, l'écran se verrouille au
+  // bout de ~30s et speechSynthesis se coupe sur la plupart des Android.
+  const wakeLockRef = useRef(null);
+
+  useEffect(() => {
+    if (!("wakeLock" in navigator)) return; // API non supportée → on ignore
+
+    const requestLock = async () => {
+      try {
+        wakeLockRef.current = await navigator.wakeLock.request("screen");
+        wakeLockRef.current.addEventListener("release", () => {
+          wakeLockRef.current = null;
+        });
+      } catch (err) {
+        // Souvent : "NotAllowedError" si l'onglet n'est pas visible. Sans gravité.
+        console.warn("WakeLock indisponible:", err?.message || err);
+      }
+    };
+
+    const releaseLock = async () => {
+      try { await wakeLockRef.current?.release(); } catch { /* ignore */ }
+      wakeLockRef.current = null;
+    };
+
+    // Réacquisition auto quand on revient sur l'onglet pendant la lecture
+    const onVisibility = () => {
+      if (document.visibilityState === "visible" && isPlaying && !wakeLockRef.current) {
+        requestLock();
+      }
+    };
+
+    if (isPlaying) {
+      requestLock();
+      document.addEventListener("visibilitychange", onVisibility);
+    }
+
+    return () => {
+      document.removeEventListener("visibilitychange", onVisibility);
+      releaseLock();
+    };
+  }, [isPlaying]);
+
   // ── speakText using Browser TTS ──────────────────────────────────────────
   const speakText = useCallback((rawText, onDone) => {
     const synth  = synthRef.current;
@@ -444,15 +486,36 @@ export default function App() {
     });
   }, []);
 
-  // ── Continuous play ────────────────────────────────────────────────────────
+  // ── Continuous play (avec enchaînement section → section) ──────────────────
   const playFrom = useCallback((idx) => {
     const section = sectionRef.current;
     if (!section || !continuousRef.current) return;
 
+    // Fin de la section atteinte
     if (idx >= section.content.length) {
-      continuousRef.current = false;
-      setIsPlaying(false);
       markSectionComplete();
+
+      // Cherche la section suivante dans le cours
+      const courseIdx = course.findIndex(s => s.id === section.id);
+      const hasNext   = courseIdx >= 0 && courseIdx < course.length - 1;
+
+      if (hasNext) {
+        const next = course[courseIdx + 1];
+        // Bascule automatique sur la section suivante
+        sectionRef.current = next;
+        setCurrentSection(next);
+        setCurrentBlockIndex(0);
+        currentIndexRef.current = 0;
+        setProgress(0);
+        // Petite pause pour respirer entre 2 sections, puis on relance
+        setTimeout(() => {
+          if (continuousRef.current) playFrom(0);
+        }, 800);
+      } else {
+        // Dernière section du cours → stop propre
+        continuousRef.current = false;
+        setIsPlaying(false);
+      }
       return;
     }
 
@@ -468,16 +531,24 @@ export default function App() {
         setTimeout(() => playFrom(idx + 1), IS_ANDROID ? 450 : 270);
       }
     });
-  }, [getBlockText, speakText, markSectionComplete]);
+  }, [course, getBlockText, speakText, markSectionComplete]);
 
   // ── Handlers ───────────────────────────────────────────────────────────────
   const handleBlockClick = useCallback((index) => {
-    continuousRef.current   = false;
     currentIndexRef.current = index;
     setCurrentBlockIndex(index);
     setProgress(((index + 1) / sectionRef.current.content.length) * 100);
+
+    // Si lecture continue active : on saute au bloc choisi SANS casser la chaîne
+    if (continuousRef.current) {
+      synthRef.current.cancel();
+      setTimeout(() => playFrom(index), 100);
+      return;
+    }
+
+    // Sinon : lecture unique du bloc (comportement d'origine)
     speakText(getBlockText(sectionRef.current.content[index]), () => {});
-  }, [speakText, getBlockText]);
+  }, [speakText, getBlockText, playFrom]);
 
   const togglePlay = useCallback(() => {
     if (isPlaying) {
