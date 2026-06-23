@@ -26,7 +26,11 @@ export default function QuizPage({ onBack }) {
   const handleAnswer = (qi, chosen) => {
     if (answers[qi] !== undefined) return;
     const correct = chosen === QCM[qi].correct;
-    setAnswers(prev => ({ ...prev, [qi]: { chosen, correct } }));
+
+setAnswers(prev => ({
+  ...prev,
+  [qi]: { chosen, correct }
+}));
   };
 
   const resetAll = () => {
