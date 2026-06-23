@@ -47,7 +47,7 @@ L'utilisateur prépare le Titre Professionnel ASD (Admin Sys DevOps) en juin 202
 ## Update (23/06/2026) — Avant soutenance ASD
 - ✅ **Quiz étendu : 23 → 103 QCM** couvrant les 11 CP du REAC (15/11/2021 V01)
 - ✅ Nouvelles sections : CCP1 (CP1-CP5), CCP2 (CP6-CP8), CCP3 (CP9-CP11), Transversal, Bonus Culture DevOps
-- ✅ Code couleur des sections par CCP (bleu/violet/vert/orange/gris)"
+- ✅ Code couleur des sections par CCP (bleu/violet/vert/orange/gris)
 
 ## Prioritized Backlog
 ### P0 (Done)
