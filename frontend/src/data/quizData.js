@@ -84,7 +84,7 @@ export const QCM = [
     correct: 2,
     exp: "Métriques brutes exposées par prometheus_client sur :8000/metrics. :9090 = interface Prometheus, :8501 = Streamlit." },
   { section: "05 — Prometheus", type: "prat",
-    q: "Que signifie 'api_calls_total{status="error"}' en Prometheus ?",
+    q: "Que signifie 'api_calls_total{status=\"error\"}' en Prometheus ?",
     opts: ["Le nombre total d'appels API en cours d'exécution", "Un compteur cumulatif du nombre d'appels API CoinGecko qui ont retourné une erreur", "Le taux d'erreur par seconde", "Un histogramme des temps de réponse en erreur"],
     correct: 1,
     exp: "Counter cumulatif comptant les appels API échoués depuis le démarrage. Le label {status='error'} distingue erreurs/succès." },
