@@ -127,14 +127,14 @@ function QcmSection({ answers, onAnswer }) {
         if (q.section !== currentSection) {
           currentSection = q.section;
           const color =
-              q.section.startsWith(\"CCP1\") ? \"#2E5BBA\"   // bleu — Infra Cloud
-            : q.section.startsWith(\"CCP2\") ? \"#8E44AD\"   // violet — Déploiement continu
-            : q.section.startsWith(\"CCP3\") ? \"#16A085\"   // vert d'eau — Supervision
-            : q.section.startsWith(\"Transversal\") ? \"#D35400\" // orange — Transversal
-            : q.section.startsWith(\"Bonus\") ? \"#34495E\"  // gris foncé — Bonus
-            : q.section.startsWith(\"03\") || q.section.startsWith(\"05\") ? \"#ED7D31\"
-            : q.section.startsWith(\"06\") ? \"#70AD47\"
-            : \"#1F3864\";
+              q.section.startsWith("CCP1") ? "#2E5BBA"   // bleu — Infra Cloud
+            : q.section.startsWith("CCP2") ? "#8E44AD"   // violet — Déploiement continu
+            : q.section.startsWith("CCP3") ? "#16A085"   // vert d'eau — Supervision
+            : q.section.startsWith("Transversal") ? "#D35400" // orange — Transversal
+            : q.section.startsWith("Bonus") ? "#34495E"  // gris foncé — Bonus
+            : q.section.startsWith("03") || q.section.startsWith("05") ? "#ED7D31"
+            : q.section.startsWith("06") ? "#70AD47"
+            : "#1F3864";
           labels.push(
             <div key={"sec-"+i} style={{ ...S.sectionLabel, background: color }}>{q.section}</div>
           );
