@@ -31,7 +31,23 @@ L'utilisateur prépare le Titre Professionnel ASD (Admin Sys DevOps) en juin 202
 - ✅ Surlignage du bloc en cours de lecture
 - ✅ Sauvegarde progression en base MongoDB
 - ✅ Navigation section précédente/suivante
+- ✅ Design Swiss/High-Contrast (IBM Plex Sans/Inter)" --new-str "## Implemented Features (26/03/2026)
+- ✅ 5 sections de cours (Intro IA, IaC, Docker/CI-CD, Monitoring, Questions Jury)
+- ✅ Lecteur audio avec Web Speech Synthesis
+- ✅ Contrôles: Play/Pause/Stop, Vitesse (0.5x-2x), Sélection voix
+- ✅ Navigation sidebar avec icônes
+- ✅ Suivi de progression (sections complétées marquées)
+- ✅ Barre de progression visuelle
+- ✅ Blocs colorés par type (concept, technique, sécurité, Q/R jury)
+- ✅ Surlignage du bloc en cours de lecture
+- ✅ Sauvegarde progression en base MongoDB
+- ✅ Navigation section précédente/suivante
 - ✅ Design Swiss/High-Contrast (IBM Plex Sans/Inter)
+
+## Update (23/06/2026) — Avant soutenance ASD
+- ✅ **Quiz étendu : 23 → 103 QCM** couvrant les 11 CP du REAC (15/11/2021 V01)
+- ✅ Nouvelles sections : CCP1 (CP1-CP5), CCP2 (CP6-CP8), CCP3 (CP9-CP11), Transversal, Bonus Culture DevOps
+- ✅ Code couleur des sections par CCP (bleu/violet/vert/orange/gris)"
 
 ## Prioritized Backlog
 ### P0 (Done)
