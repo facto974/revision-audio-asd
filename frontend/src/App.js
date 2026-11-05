@@ -666,7 +666,7 @@ export default function App() {
   const renderBlock = (block, index) => {
     const active  = index === currentBlockIndex && isPlaying;
     const current = index === currentBlockIndex;
-    
+
     // Special rendering for tool_card type
     if (block.type === "tool_card") {
       return (
@@ -702,7 +702,7 @@ export default function App() {
         </div>
       );
     }
-    
+
     return (
       <div
         key={index}
@@ -712,10 +712,12 @@ export default function App() {
         title="Cliquez pour écouter"
       >
         <div className="block-play-indicator"><Volume1 size={16} /></div>
-        {block.title    && <h3 className="block-title">{block.title}</h3>}
-        {block.question && <p className="qa-question">{block.question}</p>}
-        {block.answer   && <p className="qa-answer">{block.answer}</p>}
-        {block.text && !block.answer && <p className="block-text">{block.text}</p>}
+        <div className="block-content-wrapper">
+          {block.title && <h3 className="block-title">{block.title}</h3>}
+          {block.question && <p className="qa-question">{block.question}</p>}
+          {block.answer && <p className="qa-answer">{block.answer}</p>}
+          {block.text && !block.answer && <p className="block-text">{block.text}</p>}
+        </div>
       </div>
     );
   };
@@ -858,28 +860,28 @@ export default function App() {
                       { name: "fr-FR-DeniseNeural", gender: "Female", locale: "fr-FR" },
                     ]).map(v => (
                       <SelectItem key={v.name} value={v.name}>
-                        {v.gender === "Male" ? "🎥 Homme" : "🎥 Femme"} — {v.name}
+                        {v.gender === "Male" ? "🎙️ Homme" : "🎙️ Femme"} — {v.name}
                       </SelectItem>
                     ))
                   : voices.map(v => (
                       <SelectItem key={v.name} value={v.name}>
-                        {voiceGenders[v.name] === 'male' ? "🎥 Homme" : voiceGenders[v.name] === 'female' ? "🎥 Femme" : "🎥 Voix"} — {v.name}
+                        {voiceGenders[v.name] === 'male' ? "🎙️ Homme" : voiceGenders[v.name] === 'female' ? "🎙️ Femme" : "🎙️ Voix"} — {v.name}
                       </SelectItem>
                     ))}
               </SelectContent>
             </Select>
           </div>
-          <Select value={speed.toString()} onValueChange={changeSpeed}>
-            <SelectTrigger className="speed-select"><SelectValue /></SelectTrigger>
-            <SelectContent className="z-[70]">
-              {[0.5, 0.6, 0.7, 0.8, 0.9, 1, 1.25, 1.5].map(s =>
-                <SelectItem key={s} value={s.toString()}>{s}x</SelectItem>)}
+          <div className="setting-group">
+            <Select value={speed.toString()} onValueChange={changeSpeed}>
+              <SelectTrigger className="speed-select"><SelectValue /></SelectTrigger>
+              <SelectContent className="z-[70]">
+                {[0.5, 0.6, 0.7, 0.8, 0.9, 1, 1.25, 1.5].map(s =>
+                  <SelectItem key={s} value={s.toString()}>{s}x</SelectItem>)}
               </SelectContent>
             </Select>
           </div>
         </div>
       </div>
-    </div>
     </div>
   );
 }
