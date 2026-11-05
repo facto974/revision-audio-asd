@@ -1,37 +1,36 @@
-# Révision Audio ASD — TopGainersCryptoProject 🎧
+# Révision Audio ASD — TopGainersCryptoProject ���
 
 Support de révision audio pour présenter le projet **TopGainersCryptoProject** devant le jury du Titre Professionnel ASD (Admin Sys DevOps).
 
-## 🚀 Déploiement sur Render (1 seule app)
+## ��� Déploiement sur Vercel (frontend statique)
 
-### Étape 1 : Base de données MongoDB (gratuit, suivi de progression)
-1. Va sur [cloud.mongodb.com](https://cloud.mongodb.com)
-2. Crée un compte et un cluster gratuit (M0)
-3. Dans "Database Access" → Crée un utilisateur
-4. Dans "Network Access" → Add IP → **Allow Access from Anywhere** (0.0.0.0/0)
-5. Copie l'URL de connexion : `mongodb+srv://USER:PASS@cluster.xxxxx.mongodb.net/revision_asd`
+Le frontend React est déployé sur Vercel en tant que site statique. Le backend FastAPI (suivi de progression en MongoDB) doit être hébergé séparément (ex: Render, Railway, etc.) ou le suivi de progression peut être désactivé pour une démo 100% statique.
 
-### Étape 2 : Déployer sur Render
-1. Va sur [render.com](https://render.com) → **New** → **Web Service**
-2. Connecte ton repo `facto974/revision-audio-asd`
-3. Configure :
+### Étape 1 : Connecter le repo à Vercel
+1. Va sur [vercel.com](https://vercel.com)
+2. Clique sur **Add New Project**
+3. Importe ton dépôt GitHub `facto974/revision-audio-asd`
+4. Dans les réglages du build, laisse les valeurs par défaut ou configure :
 
 | Paramètre | Valeur |
 |-----------|--------|
-| Name | `revision-audio-asd` |
-| Root Directory | *(vide)* |
-| Runtime | `Python 3` |
-| Build Command | `chmod +x build.sh && ./build.sh` |
-| Start Command | `cd backend && uvicorn server:app --host 0.0.0.0 --port $PORT` |
+| Framework Preset | `Create React App` |
+| Root Directory | `frontend` (ou laisse à la racine si vercel.json pointe vers `frontend/package.json`) |
+| Build Command | `yarn build` ou `npm run build` |
+| Output Directory | `build` |
 
-4. Environment Variables (Advanced) :
-   ```
-   MONGO_URL = mongodb+srv://USER:PASS@cluster.xxxxx.mongodb.net/revision_asd
-   DB_NAME = revision_asd
-   ```
-5. Clique **Create Web Service**
+5. Clique sur **Deploy**
 
-Ton app sera disponible sur `https://revision-audio-asd.onrender.com`
+Ton app sera disponible sur une URL de type `https://revision-audio-asd.vercel.app`
+
+### Étape 2 : Variables d'environnement (optionnel)
+Si tu utilises le backend FastAPI avec suivi de progression MongoDB, ajoute dans les **Settings → Environment Variables** de Vercel :
+
+```
+REACT_APP_BACKEND_URL = https://ton-backend.onrender.com
+```
+
+Puis redéploye.
 
 ## 📚 Contenu de révision
 Le support couvre les 11 compétences du REAC ASD à travers 5 sections :
@@ -43,12 +42,12 @@ Le support couvre les 11 compétences du REAC ASD à travers 5 sections :
 
 ## 🔧 Installation locale
 ```bash
-# Terminal 1 - Backend
+# Terminal 1 - Backend (FastAPI + MongoDB)
 cd backend
 pip install -r requirements.txt
 uvicorn server:app --reload --port 8001
 
-# Terminal 2 - Frontend
+# Terminal 2 - Frontend (React)
 cd frontend
 yarn install
 yarn start
