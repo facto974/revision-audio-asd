@@ -842,14 +842,30 @@ export default function App() {
         <div className="player-settings">
           <div className="setting-group">
             <Volume2 size={16} className="setting-icon" />
-            <Select value={selectedVoice?.name || ""} onValueChange={v => setSelectedVoice(voices.find(x => x.name === v))}>
+            <span className="engine-badge">{ttsMode === "edge" ? "🔊 Edge TTS (naturel)" : "🌐 Navigateur"}</span>
+            <Select
+              value={ttsMode === "edge" ? selectedEdgeVoice : (selectedVoice?.name || "")}
+              onValueChange={v => {
+                if (ttsMode === "edge") setSelectedEdgeVoice(v);
+                else setSelectedVoice(voices.find(x => x.name === v));
+              }}
+            >
               <SelectTrigger className="voice-select"><SelectValue placeholder="Voix" /></SelectTrigger>
               <SelectContent className="z-[70]">
-                {voices.map(v => (
-                  <SelectItem key={v.name} value={v.name}>
-                    {voiceGenders[v.name] === 'male' ? "🎙️ Homme" : voiceGenders[v.name] === 'female' ? "🎙️ Femme" : "🎙️ Voix"}
-                  </SelectItem>
-                ))}
+                {ttsMode === "edge"
+                  ? (edgeVoices.length ? edgeVoices : [
+                      { name: "fr-FR-HenriNeural", gender: "Male", locale: "fr-FR" },
+                      { name: "fr-FR-DeniseNeural", gender: "Female", locale: "fr-FR" },
+                    ]).map(v => (
+                      <SelectItem key={v.name} value={v.name}>
+                        {v.gender === "Male" ? "🎥 Homme" : "🎥 Femme"} — {v.name}
+                      </SelectItem>
+                    ))
+                  : voices.map(v => (
+                      <SelectItem key={v.name} value={v.name}>
+                        {voiceGenders[v.name] === 'male' ? "🎥 Homme" : voiceGenders[v.name] === 'female' ? "🎥 Femme" : "🎥 Voix"} — {v.name}
+                      </SelectItem>
+                    ))}
               </SelectContent>
             </Select>
           </div>
@@ -858,10 +874,12 @@ export default function App() {
             <SelectContent className="z-[70]">
               {[0.5, 0.6, 0.7, 0.8, 0.9, 1, 1.25, 1.5].map(s =>
                 <SelectItem key={s} value={s.toString()}>{s}x</SelectItem>)}
-            </SelectContent>
-          </Select>
+              </SelectContent>
+            </Select>
+          </div>
         </div>
       </div>
+    </div>
     </div>
   );
 }
