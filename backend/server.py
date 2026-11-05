@@ -1965,7 +1965,7 @@ async def get_audio(section_id: str):
     )
 
 # ====================== EDGE TTS (Natural Voice) ======================
-EDGE_VOICE = "fr-FR-DeniseNeural"  # Voix française naturelle
+EDGE_VOICE = "fr-FR-HenriNeural"  # Voix française naturelle
 
 async def generate_edge_audio(text: str, voice: str = EDGE_VOICE, rate: str = "-10%") -> bytes:
     """Generate audio using Edge TTS (Microsoft natural voices)"""

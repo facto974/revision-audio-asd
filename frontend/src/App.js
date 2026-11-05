@@ -214,7 +214,7 @@ export default function App() {
   const [sidebarOpen,     setSidebarOpen]     = useState(false);
   const [progress,        setProgress]        = useState(0);
   const [mode,            setMode]            = useState("audio");
-  const [ttsMode]         = useState("browser");
+  const [ttsMode]         = useState("edge");
   const [edgeVoices,      setEdgeVoices]      = useState([]);
   const [selectedEdgeVoice, setSelectedEdgeVoice] = useState("fr-FR-HenriNeural");
   const [isLoadingAudio,  setIsLoadingAudio]  = useState(false);
@@ -455,6 +455,41 @@ export default function App() {
     }
   }, []);
 
+
+  // ── speakText using Edge TTS (natural voice) ────────────────────────────────
+  const playEdgeAudio = useCallback(async (sectionId, blockIndex, onDone) => {
+    setIsLoadingAudio(true);
+    setIsPlaying(true);
+    try {
+      const API_BASE = process.env.REACT_APP_BACKEND_URL || "";
+      const url = `${API_BASE}/api/tts/block/${sectionId}/${blockIndex}?voice=${encodeURIComponent(selectedEdgeVoice)}&rate=-10%`;
+      const res = await fetch(url);
+      if (!res.ok) throw new Error("Edge TTS failed: " + res.status);
+      const blob = await res.blob();
+      const audioUrl = URL.createObjectURL(blob);
+      const audio = new Audio(audioUrl);
+      audio.play();
+      audio.onended = () => {
+        URL.revokeObjectURL(audioUrl);
+        setIsPlaying(false);
+        setIsLoadingAudio(false);
+        onDone?.();
+      };
+      audio.onerror = () => {
+        URL.revokeObjectURL(audioUrl);
+        setIsPlaying(false);
+        setIsLoadingAudio(false);
+        onDone?.();
+      };
+      audioRef.current = audio;
+    } catch (e) {
+      console.error("Edge TTS error", e);
+      setIsPlaying(false);
+      setIsLoadingAudio(false);
+      onDone?.();
+    }
+  }, [selectedEdgeVoice]);
+
   // ── Block text ─────────────────────────────────────────────────────────────
   const getBlockText = useCallback((block) => {
     // Special handling for tool_card type
@@ -526,12 +561,20 @@ export default function App() {
     const text = getBlockText(section.content[idx]);
     if (!text.trim()) { playFrom(idx + 1); return; } // skip empty blocks
 
-    speakText(text, () => {
-      if (continuousRef.current) {
-        setTimeout(() => playFrom(idx + 1), IS_ANDROID ? 450 : 270);
-      }
-    });
-  }, [course, getBlockText, speakText, markSectionComplete]);
+    if (ttsMode === "edge") {
+      playEdgeAudio(section.id, idx, () => {
+        if (continuousRef.current) {
+          setTimeout(() => playFrom(idx + 1), IS_ANDROID ? 450 : 270);
+        }
+      });
+    } else {
+      speakText(text, () => {
+        if (continuousRef.current) {
+          setTimeout(() => playFrom(idx + 1), IS_ANDROID ? 450 : 270);
+        }
+      });
+    }
+  }, [course, getBlockText, speakText, playEdgeAudio, markSectionComplete, ttsMode]);
 
   // ── Handlers ───────────────────────────────────────────────────────────────
   const handleBlockClick = useCallback((index) => {
@@ -546,15 +589,24 @@ export default function App() {
       return;
     }
 
-    // Sinon : lecture unique du bloc (comportement d'origine)
-    speakText(getBlockText(sectionRef.current.content[index]), () => {});
+    // Sinon : lecture unique du bloc
+    const block = sectionRef.current.content[index];
+    const blockText = getBlockText(block);
+    if (!blockText.trim()) return;
+    if (ttsMode === "edge") {
+      playEdgeAudio(sectionRef.current.id, index, () => {});
+    } else {
+      speakText(blockText, () => {});
+    }
   }, [speakText, getBlockText, playFrom]);
 
   const togglePlay = useCallback(() => {
     if (isPlaying) {
       synthRef.current.cancel();
+      try { if (audioRef.current) { audioRef.current.pause(); } } catch {}
       continuousRef.current = false;
       setIsPlaying(false);
+      setIsLoadingAudio(false);
     } else {
       continuousRef.current = true;
       playFrom(currentBlockIndex);
@@ -563,11 +615,13 @@ export default function App() {
 
   const stopPlayback = useCallback(() => {
     synthRef.current.cancel();
+    try { if (audioRef.current) { audioRef.current.pause(); audioRef.current.src = ""; } } catch {}
     continuousRef.current   = false;
     currentIndexRef.current = 0;
     setIsPlaying(false);
     setCurrentBlockIndex(0);
     setProgress(0);
+    setIsLoadingAudio(false);
   }, []);
 
   const changeSection = useCallback((section) => {
