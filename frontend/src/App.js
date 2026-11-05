@@ -458,6 +458,10 @@ export default function App() {
 
   // ── speakText using Edge TTS (natural voice) ────────────────────────────────
   const playEdgeAudio = useCallback(async (sectionId, blockIndex, onDone) => {
+    if (!continuousRef.current) {
+      onDone?.();
+      return;
+    }
     setIsLoadingAudio(true);
     setIsPlaying(true);
     try {
@@ -467,19 +471,24 @@ export default function App() {
       if (!res.ok) throw new Error("Edge TTS failed: " + res.status);
       const blob = await res.blob();
       const audioUrl = URL.createObjectURL(blob);
-      const audio = new Audio(audioUrl);
-      await audio.play(); // attendre le démarrage réel
+
+      // Réutiliser un seul élément audio (plus compatible Chrome/autoplay)
+      const audio = audioRef.current || new Audio();
       audioRef.current = audio;
+      audio.src = audioUrl;
+      audio.load();
+      await audio.play();
 
       audio.onended = () => {
         URL.revokeObjectURL(audioUrl);
         setIsLoadingAudio(false);
-        // Ne pas mettre isPlaying(false) ici : on enchaîne automatiquement
+        // Ne pas toucher à isPlaying ici : on reste en lecture pour l'enchaînement
         onDone?.();
       };
 
       audio.onerror = () => {
         URL.revokeObjectURL(audioUrl);
+        console.error("Audio element error on Chrome/Edge");
         setIsPlaying(false);
         setIsLoadingAudio(false);
         onDone?.();
@@ -563,10 +572,13 @@ export default function App() {
     const text = getBlockText(section.content[idx]);
     if (!text.trim()) { playFrom(idx + 1); return; } // skip empty blocks
 
+    // Vérifier que la lecture continue est toujours active avant de lancer le bloc
+    if (!continuousRef.current) return;
+
     if (ttsMode === "edge") {
       playEdgeAudio(section.id, idx, () => {
+        // Vérifier que l'enchaînement n'a pas été arrêté entre-temps
         if (continuousRef.current) {
-          // Délai légèrement plus long pour laisser respirer (usage voiture)
           setTimeout(() => {
             if (continuousRef.current) playFrom(idx + 1);
           }, 600);
@@ -614,6 +626,9 @@ export default function App() {
       setIsLoadingAudio(false);
     } else {
       continuousRef.current = true;
+      setIsPlaying(true);
+      // Préparer le contexte audio sur Chrome (autoplay policy)
+      try { if (audioRef.current) audioRef.current.play().catch(() => {}); } catch {}
       playFrom(currentBlockIndex);
     }
   }, [isPlaying, currentBlockIndex, playFrom]);
