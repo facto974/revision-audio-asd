@@ -1,69 +1,41 @@
-# Application Révision Audio ASD
+# Support de révision audio — TopGainersCryptoProject (Titre Pro ASD)
 
 ## Problem Statement
-L'utilisateur prépare le Titre Professionnel ASD (Admin Sys DevOps) en juin 2026. Il a besoin d'une application pour apprendre sa fiche de révision en audio de manière intelligente - pas juste une lecture, mais un vrai cours explicatif.
+L'utilisateur prépare le Titre Professionnel ASD (Admin Sys DevOps) en juin 2026. Il a besoin d'un support de révision audio pour présenter son projet **TopGainersCryptoProject** devant un jury lors de la soutenance.
 
-## Architecture
+## Architecture du support de révision
 - **Frontend**: React 19 + Tailwind CSS + Shadcn UI
-- **Backend**: FastAPI + MongoDB
-- **TTS**: Web Speech Synthesis API (gratuit, navigateur)
+- **Backend**: FastAPI + MongoDB (suivi de progression)
+- **TTS**: Web Speech Synthesis API (gratuit, navigateur) + edge-tts / pyttsx3 côté serveur
+- **Projet présenté**: TopGainersCryptoProject (Streamlit + PostgreSQL + Prometheus/Grafana + Docker + Terraform + AWS + GitHub Actions)
 
-## User Personas
-- Candidat titre pro ASD préparant l'examen
-- Besoin d'apprentissage audio pour mémoriser les concepts DevOps
-
-## Core Requirements (Static)
-1. Lecture audio du contenu de révision
+## Core Requirements
+1. Lecture audio du contenu de révision (Web Speech Synthesis)
 2. Contenu explicatif (cours, pas simple lecture)
-3. Navigation par blocs/sections
-4. Contrôle de vitesse
-5. Suivi de progression
-6. Solution 100% gratuite
+3. Navigation par blocs/sections (5 sections)
+4. Contrôle de vitesse (0.5x-2x) et sélection de voix
+5. Suivi de progression (sections complétées)
+6. QCM de révision adaptés au projet TopGainersCryptoProject
+7. Solution 100% gratuite
 
-## Implemented Features (26/03/2026)
-- ✅ 5 sections de cours (Intro IA, IaC, Docker/CI-CD, Monitoring, Questions Jury)
+## Sections du cours
+1. Introduction & Présentation du projet TopGainersCryptoProject
+2. Architecture technique (Stack, flux de données, sécurité)
+3. Docker, CI/CD et Déploiement (Dockerfile, Compose, GitHub Actions, Terraform, k3s)
+4. Monitoring & Supervision (Prometheus, Grafana, métriques, alertes)
+5. Questions du jury & Réponses préparées
+
+## Implemented Features
+- ✅ 5 sections de cours adaptées à TopGainersCryptoProject
 - ✅ Lecteur audio avec Web Speech Synthesis
 - ✅ Contrôles: Play/Pause/Stop, Vitesse (0.5x-2x), Sélection voix
 - ✅ Navigation sidebar avec icônes
 - ✅ Suivi de progression (sections complétées marquées)
-- ✅ Barre de progression visuelle
 - ✅ Blocs colorés par type (concept, technique, sécurité, Q/R jury)
-- ✅ Surlignage du bloc en cours de lecture
+- ✅ QCM corrigés (PostgreSQL, CI/CD, monitoring, sécurité, questions jury)
 - ✅ Sauvegarde progression en base MongoDB
-- ✅ Navigation section précédente/suivante
-- ✅ Design Swiss/High-Contrast (IBM Plex Sans/Inter)" --new-str "## Implemented Features (26/03/2026)
-- ✅ 5 sections de cours (Intro IA, IaC, Docker/CI-CD, Monitoring, Questions Jury)
-- ✅ Lecteur audio avec Web Speech Synthesis
-- ✅ Contrôles: Play/Pause/Stop, Vitesse (0.5x-2x), Sélection voix
-- ✅ Navigation sidebar avec icônes
-- ✅ Suivi de progression (sections complétées marquées)
-- ✅ Barre de progression visuelle
-- ✅ Blocs colorés par type (concept, technique, sécurité, Q/R jury)
-- ✅ Surlignage du bloc en cours de lecture
-- ✅ Sauvegarde progression en base MongoDB
-- ✅ Navigation section précédente/suivante
-- ✅ Design Swiss/High-Contrast (IBM Plex Sans/Inter)
 
-## Update (23/06/2026) — Avant soutenance ASD
-- ✅ **Quiz étendu : 23 → 103 QCM** couvrant les 11 CP du REAC (15/11/2021 V01)
-- ✅ Nouvelles sections : CCP1 (CP1-CP5), CCP2 (CP6-CP8), CCP3 (CP9-CP11), Transversal, Bonus Culture DevOps
-- ✅ Code couleur des sections par CCP (bleu/violet/vert/orange/gris)
-
-## Prioritized Backlog
-### P0 (Done)
-- Lecture audio complète
-- Navigation sections
-
-### P1 (Future)
-- Mode quiz interactif sur les questions jury
-- Export PDF de la fiche
-
-### P2 (Future)
-- Mode sombre
-- Partage de progression
-- Autres fiches de révision
-
-## Next Action Items
-1. Tester l'audio dans un vrai navigateur (Chrome/Firefox avec voix FR)
-2. Ajouter mode quiz pour les questions jury
-3. Permettre l'upload de nouvelles fiches
+## Before the defense (TODO)
+- Tester l'audio dans un vrai navigateur (voix FR)
+- Répéter les réponses aux questions du jury
+- Préparer une démo live de l'app (`docker compose up -d`)
