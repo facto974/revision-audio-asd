@@ -468,20 +468,22 @@ export default function App() {
       const blob = await res.blob();
       const audioUrl = URL.createObjectURL(blob);
       const audio = new Audio(audioUrl);
-      audio.play();
+      await audio.play(); // attendre le démarrage réel
+      audioRef.current = audio;
+
       audio.onended = () => {
         URL.revokeObjectURL(audioUrl);
-        setIsPlaying(false);
         setIsLoadingAudio(false);
+        // Ne pas mettre isPlaying(false) ici : on enchaîne automatiquement
         onDone?.();
       };
+
       audio.onerror = () => {
         URL.revokeObjectURL(audioUrl);
         setIsPlaying(false);
         setIsLoadingAudio(false);
         onDone?.();
       };
-      audioRef.current = audio;
     } catch (e) {
       console.error("Edge TTS error", e);
       setIsPlaying(false);
@@ -564,7 +566,10 @@ export default function App() {
     if (ttsMode === "edge") {
       playEdgeAudio(section.id, idx, () => {
         if (continuousRef.current) {
-          setTimeout(() => playFrom(idx + 1), IS_ANDROID ? 450 : 270);
+          // Délai légèrement plus long pour laisser respirer (usage voiture)
+          setTimeout(() => {
+            if (continuousRef.current) playFrom(idx + 1);
+          }, 600);
         }
       });
     } else {
