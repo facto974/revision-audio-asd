@@ -35,6 +35,37 @@ const IS_MOBILE  = /iPhone|iPad|iPod|Android/i.test(navigator.userAgent);
 // from the previous utterance become no-ops.
 let gToken = 0;
 
+// ─── Audio context unlock for mobile (Chrome/Android, Safari/iOS) ─────────────
+// Les navigateurs mobiles bloquent l'autoplay audio tant qu'il n'y a pas eu
+// d'interaction utilisateur directe. On resume le contexte audio au premier clic.
+let audioUnlocked = false;
+
+async function unlockAudio() {
+  if (audioUnlocked) return;
+  try {
+    const AudioContext = window.AudioContext || window.webkitAudioContext;
+    if (AudioContext) {
+      const ctx = new AudioContext();
+      if (ctx.state === 'suspended') {
+        await ctx.resume();
+      }
+      ctx.close();
+    }
+    audioUnlocked = true;
+    console.log('Audio context unlocked for mobile');
+  } catch (e) {
+    console.warn('Could not unlock audio context:', e);
+  }
+}
+
+// Attacher le deblocage au premier clic utilisateur (garanti sur mobile)
+if (typeof window !== 'undefined') {
+  const unlockHandler = () => { unlockAudio(); };
+  window.addEventListener('pointerup', unlockHandler, { once: true });
+  window.addEventListener('touchend', unlockHandler, { once: true });
+  window.addEventListener('click', unlockHandler, { once: true });
+}
+
 // ─── Text helpers ─────────────────────────────────────────────────────────────
 const MAX_CHUNK = IS_ANDROID ? 130 : 190;
 
@@ -458,6 +489,9 @@ export default function App() {
 
   // ── speakText using Edge TTS (natural voice) ────────────────────────────────
   const playEdgeAudio = useCallback(async (sectionId, blockIndex, onDone) => {
+    // Deblocage audio mobile
+    unlockAudio();
+
     if (!continuousRef.current) {
       onDone?.();
       return;
@@ -618,6 +652,9 @@ export default function App() {
   }, [speakText, getBlockText, playFrom]);
 
   const togglePlay = useCallback(() => {
+    // Deblocage audio mobile (Chrome Android, Safari iOS)
+    unlockAudio();
+
     if (isPlaying) {
       synthRef.current.cancel();
       try { if (audioRef.current) { audioRef.current.pause(); } } catch {}
@@ -862,6 +899,13 @@ export default function App() {
         </div>
 
         <div className="player-settings">
+          <div className="setting-group">
+            <Volume2 size={16} className="setting-icon" />
+          {!audioUnlocked && IS_MOBILE && (
+            <Button size="sm" variant="destructive" onClick={unlockAudio} className="w-full mb-2">
+              Activer l audio (requis sur mobile)
+            </Button>
+          )}
           <div className="setting-group">
             <Volume2 size={16} className="setting-icon" />
             <span className="engine-badge">{ttsMode === "edge" ? "🔊 Edge TTS (naturel)" : "🌐 Navigateur"}</span>
