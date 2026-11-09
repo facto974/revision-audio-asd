@@ -939,19 +939,18 @@ export default function App() {
             <Select value={speed.toString()} onValueChange={changeSpeed}>
               <SelectTrigger className="speed-select"><SelectValue /></SelectTrigger>
               <SelectContent className="z-[70]">
-                {[0.5, 0.6, 0.7, 0.8, 0.9, 1, 1.25, 1.5].map(s => (
-                  <SelectItem key={s} value={s.toString()}>{s}x</SelectItem>
-                ))}
+                {[0.5, 0.6, 0.7, 0.8, 0.9, 1, 1.25, 1.5].map(s =>
+                  <SelectItem key={s} value={s.toString()}>{s}x</SelectItem>)}
               </SelectContent>
             </Select>
           </div>
-              </div>
         </div>
       </div>
     </div>
-  </Select>
-  </Select>
   </div>
   </div>
+  </div>
+  </Select>
+  </Select>
   );
 }
