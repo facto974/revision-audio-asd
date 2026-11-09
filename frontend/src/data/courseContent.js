@@ -72,4 +72,22 @@ export const COURSE_CONTENT = [
       { type: "conclusion", title: "Pour finir", text: "Tu connais ton projet par cœur. Le jury n'attend pas une récitation, il attend ta compréhension et ton honnêteté. Si tu ne sais pas, dis-le et propose une piste d'amélioration. Bonne chance Romain !" },
     ],
   },
+
+
+  {
+    id: "devops-checklist", title: "Checklist Dé minimum DevOps Titre ASD", icon: "CheckCircle",
+    content: [
+      { type: "intro", text: "Pour le Titre Professionnel ASD, ces notions doivent être maîtrisées à minima :" },
+      { type: "checklist", title: "CI/CD et Automation", text: "Savoir qu'un pipeline CI/CD (ici GitHub Actions) automate les tests, le build Docker et le déploiement. Savoir lire un fichier de pipeline et comprendre les étapes : test → build → deploy.", },
+      { type: "checklist", title: "Containerisation", text: "Savoir qu'un Dockerfile crée une image portable. Savoir les concepts : image vs container, USER non-root, exposition de ports, volumes pour la persistance.", },
+      { type: "checklist", title: "Infrastructure as Code", text: "Savoir que Terraform (ou équivalent) permet de décrire l'infrastructure en code. Connaître les concepts : provider, resource, état de l'infrastructure (state file), apply/destroy.", },
+      { type: "checklist", title: "Base de données", text: "Savoir que PostgreSQL est une base relationnelle. Connaître : CREATE TABLE, INSERT, SELECT, persistance via volumes Docker, différences avec SQLite (concurrent écriture).", },
+      { type: "checklist", title: "Monitoring et Supervision", text: "Savoir que Prometheus scrappe les métriques toutes les 10s, que Grafana affiche les tableaux de bord. Savoir lire un histogramme et un compteur.", },
+      { type: "checklist", title: "Cloud et Réseau", text: "Savoir qu'on peut déployer sur AWS (EC2 t3.micro en Free Tier). Savoir qu'un Security Group contrôle l'accès SSH. Savoir qu'une clé SSH et un .gitignore protègent les secrets.", },
+      { type: "checklist", title: "Orchestration", text: "Savoir que Kubernetes (ou k3s) orchestre des conteneurs. Savoir : Deployment, Service, Pod, persistance via PVC.", },
+      { type: "checklist", title: "Sécurité de base", text: "Savoir ne jamais dehardcode les mots de passe (utiliser des variables d'environnement / GitHub Secrets). Savoir qu'un utilisateur non-root limite les dommages en cas de compromission.", },
+      { type: "conclusion", text: "Si vous maîtrisez ces 9 points, vous remplissez le minimum requis pour le module DevOps du Titre ASD. Le reste s'apprend sur le terrain." },
+    ],
+  },
+
 ];
