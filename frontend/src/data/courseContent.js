@@ -12,7 +12,24 @@ export const COURSE_CONTENT = [
     ],
   },
   {
-    id: "architecture", title: "Architecture technique", icon: "Link",
+    id: 
+  {
+    id: "restaurant", title: "Métaphore Restaurant - Comprendre le projet", icon: "Utensils",
+    content: [
+      { type: "intro", text: "Pour bien comprendre l'architecture de TopGainersCryptoProject, imaginons un restaurant classique. Chaque technologie du projet joue un rôle précis, comme dans une cuisine professionnelle." },
+      { type: "concept", title: "Le Client (Frontend Streamlit)", text: "C'est vous, assis à une table. Vous passez votre commande (demande de crypto-prix) via l'interface Streamlit. Le serveur (frontend) transmet votre commande à la cuisine. Sans vous, pas de restaurant." },
+      { type: "concept", title: "Le Serveur (Docker Compose)", text: "Il coordonne tout entre la salle et la cuisine. Il s'assure que le plat (les données) arrive à la bonne table au bon moment, avec les bonnes garnitures (métriques Prometheus)." },
+      { type: "concept", title: "La Cuisine (Backend Python + top_movers.py)", text: "C'est ici que tout est préparé. L'ingénieur chef (Python 3.9) découpe les ingrédients (récupère les données CoinGecko), prépare le plat (trie les top gainers) et s'assure que la recette est suivie à la lettre." },
+      { type: "concept", title: "Le Placard (PostgreSQL)", text: "Tout est rangé dans des boîtes étiquetées. Quand le chef a besoin d'un ingrédient (une donnée), il va au placard, il trouve exactement ce qu'il faut, avec la date de fraîcheur (l'horodatage). C'est le seul endroit où tout est stocké de façon pérenne." },
+      { type: "concept", title: "Le Guide Michelin (Prometheus + Grafana)", text: "Le guide qui note tout ce qui se passe en cuisine : combien de plats sortent, combien de temps ça prend, s'il y a eu des erreurs. En salle, le serveur consulte le guide pour prévenir les clients s'il y a un problème." },
+      { type: "concept", title: "L'Inventaire (Terraform + AWS)", text: "L'intendant vérifie les stocks et commande ce qui manque. Il s'assure que le restaurant a assez de nourriture (instance EC2 t3.micro), que les casseroles sont propres (Security Group) et que la cave à vin (EBS 20 Go) est bien remplie." },
+      { type: "concept", title: "Le Facteur (GitHub Actions)", text: "Tous les matins, le facteur apporte les ingrédients frais (build Docker) et récupète les assiettes sales (tests pytest). Si quelque chose ne va pas, il le signale au chef avant que le restaurant n'ouvre." },
+      { type: "concept", title: "Le Gestionnaire (k3s Kubernetes)", text: "Pour un très grand restaurant qui doit servir 1000 clients à la fois, on n'utilise plus une seule cuisine. On a plusieurs cuisines qui travaillent ensemble (Cluster k3s), avec un maître qui distribue le travail." },
+      { type: "jury", title: "Question du jury — Métaphore", text: "Le jury pourrait te demander : 'Expliquez le rôle de PostgreSQL dans votre projet.' Ta réponse : 'C'est le placard où l'on stocke de façon persistante toutes les données saisies, avec un horodatage. C'est la seule source de vérité qui survive aux redémarrages du conteneur.'." },
+    ],
+  },
+
+"architecture", title: "Architecture technique", icon: "Link",
     content: [
       { type: "concept", title: "La stack technique", text: "Le front-end utilise Streamlit en Python sur le port huit cent cinquante et un. Le back-end est en Python trois point neuf, avec quatre fichiers : application point py pour l'interface, top movers point py pour l'appel à l'API Coin Gecko, d b point py pour l'accès à la base de données, et logging conf point py pour les logs et les métriques Prometheus. La base de données est PostgreSQL seize Alpine sur le port cinq cent quarante-trois. Le monitoring utilise Prometheus sur le port neuf cent quatre-vingt-dix et Grafana sur le port trois mille. La conteneurisation utilise Docker et Docker Compose. L'intégration et le déploiement continus passent par GitHub Actions. L'infrastructure est sur Amazon Web Services avec Terraform. Une alternative utilise Kubernetes k3s." },
       { type: "concept", title: "Comment les données circulent", text: "Premièrement, application point py appelle la fonction obtenir les top movers dans le fichier top movers point py, qui interroge l'API de Coin Gecko. L'API gratuite renvoie les deux cent cinquante plus grosses crypto-monnaies classées par capitalisation. Deuxièmement, le tri par variation sur vingt-quatre heures se fait côté Python, car l'endpoint dédié aux \"top gainers\" est réservé à l'API payante. Troisièmement, les données sont sauvegardées dans PostgreSQL grâce à la fonction sauvegarder en base. Quatrièmement, si l'API Coin Gecko est indisponible, l'application affiche les dernières données enregistrées en base avec un avertissement. Cinquièmement, les métriques sont exposées sur le port huit cents et récupérées par Prometheus." },
