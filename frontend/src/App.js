@@ -488,52 +488,55 @@ export default function App() {
 
 
   // ── speakText using Edge TTS (natural voice) ────────────────────────────────
-  const playEdgeAudio = useCallback(async (sectionId, blockIndex, onDone) => {
-    // Deblocage audio mobile
+  const playEdgeAudio = useCallback(async (sectionId, blockIndex, onDone, fallbackText) => {
     unlockAudio();
-
-    if (!continuousRef.current) {
-      onDone?.();
-      return;
-    }
     setIsLoadingAudio(true);
     setIsPlaying(true);
+
+    let audioUrl;
+    let completed = false;
+    const fallbackToBrowser = (error) => {
+      if (completed) return;
+      completed = true;
+      if (audioUrl) URL.revokeObjectURL(audioUrl);
+      console.warn("Edge TTS unavailable; using browser speech synthesis:", error);
+      setIsLoadingAudio(false);
+      if (fallbackText?.trim()) {
+        speakText(fallbackText, onDone);
+      } else {
+        continuousRef.current = false;
+        setIsPlaying(false);
+      }
+    };
+
     try {
       const API_BASE = process.env.REACT_APP_BACKEND_URL || "";
       const url = `${API_BASE}/api/tts/block/${sectionId}/${blockIndex}?voice=${encodeURIComponent(selectedEdgeVoice)}&rate=-10%`;
       const res = await fetch(url);
       if (!res.ok) throw new Error("Edge TTS failed: " + res.status);
+      if (!(res.headers.get("content-type") || "").startsWith("audio/")) {
+        throw new Error("Edge TTS returned a non-audio response");
+      }
       const blob = await res.blob();
-      const audioUrl = URL.createObjectURL(blob);
+      audioUrl = URL.createObjectURL(blob);
 
-      // Réutiliser un seul élément audio (plus compatible Chrome/autoplay)
       const audio = audioRef.current || new Audio();
       audioRef.current = audio;
       audio.src = audioUrl;
       audio.load();
-      await audio.play();
-
       audio.onended = () => {
+        if (completed) return;
+        completed = true;
         URL.revokeObjectURL(audioUrl);
-        setIsLoadingAudio(false);
-        // Ne pas toucher à isPlaying ici : on reste en lecture pour l'enchaînement
-        onDone?.();
-      };
-
-      audio.onerror = () => {
-        URL.revokeObjectURL(audioUrl);
-        console.error("Audio element error on Chrome/Edge");
-        setIsPlaying(false);
         setIsLoadingAudio(false);
         onDone?.();
       };
-    } catch (e) {
-      console.error("Edge TTS error", e);
-      setIsPlaying(false);
-      setIsLoadingAudio(false);
-      onDone?.();
+      audio.onerror = () => fallbackToBrowser(new Error("Audio element playback failed"));
+      await audio.play();
+    } catch (error) {
+      fallbackToBrowser(error);
     }
-  }, [selectedEdgeVoice]);
+  }, [selectedEdgeVoice, speakText]);
 
   // ── Block text ─────────────────────────────────────────────────────────────
   const getBlockText = useCallback((block) => {
@@ -617,7 +620,7 @@ export default function App() {
             if (continuousRef.current) playFrom(idx + 1);
           }, 600);
         }
-      });
+      }, text);
     } else {
       speakText(text, () => {
         if (continuousRef.current) {
@@ -645,7 +648,7 @@ export default function App() {
     const blockText = getBlockText(block);
     if (!blockText.trim()) return;
     if (ttsMode === "edge") {
-      playEdgeAudio(sectionRef.current.id, index, () => {});
+      playEdgeAudio(sectionRef.current.id, index, () => {}, blockText);
     } else {
       speakText(blockText, () => {});
     }
