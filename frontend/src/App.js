@@ -649,7 +649,7 @@ export default function App() {
     } else {
       speakText(blockText, () => {});
     }
-  }, [speakText, getBlockText, playFrom]);
+  }, [speakText, getBlockText, playFrom, playEdgeAudio, ttsMode]);
 
   const togglePlay = useCallback(() => {
     // Deblocage audio mobile (Chrome Android, Safari iOS)
