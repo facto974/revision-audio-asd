@@ -906,6 +906,7 @@ export default function App() {
               Activer l audio (requis sur mobile)
             </Button>
           )}
+          </div>
           <div className="setting-group">
             <Volume2 size={16} className="setting-icon" />
             <span className="engine-badge">{ttsMode === "edge" ? "🔊 Edge TTS (naturel)" : "🌐 Navigateur"}</span>
