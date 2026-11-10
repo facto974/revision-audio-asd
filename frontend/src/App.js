@@ -502,6 +502,13 @@ export default function App() {
       console.warn("Edge TTS unavailable; using browser speech synthesis:", error);
       setIsLoadingAudio(false);
       if (fallbackText?.trim()) {
+        const selectedGender = edgeVoices.find((voice) => voice.name === selectedEdgeVoice)?.gender?.toLowerCase()
+          || (selectedEdgeVoice.toLowerCase().includes("denise") ? "female" : "male");
+        const fallbackVoice = voices.find((voice) => voiceGenders[voice.name] === selectedGender);
+        if (fallbackVoice) {
+          voiceRef.current = fallbackVoice;
+          setSelectedVoice(fallbackVoice);
+        }
         speakText(fallbackText, onDone);
       } else {
         continuousRef.current = false;
@@ -536,7 +543,7 @@ export default function App() {
     } catch (error) {
       fallbackToBrowser(error);
     }
-  }, [selectedEdgeVoice, speakText]);
+  }, [selectedEdgeVoice, edgeVoices, voices, voiceGenders, speakText]);
 
   // ── Block text ─────────────────────────────────────────────────────────────
   const getBlockText = useCallback((block) => {
