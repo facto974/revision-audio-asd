@@ -1,0 +1,952 @@
+import { useState, useEffect, useCallback, useRef } from "react";
+import "@/App.css";
+import { Button } from "./components/ui/button";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "./components/ui/select";
+import { ScrollArea } from "./components/ui/scroll-area";
+import { COURSE_CONTENT } from "./data/courseContent";
+import {
+  Play, Pause, Square, Volume2, Menu, X, CheckCircle2,
+  Brain, Server, Container, Activity, HelpCircle, ChevronRight, ChevronLeft,
+  Terminal, Shield, Cloud, GitBranch, Database, Layers, BarChart, Globe, Wrench, Volume1, Link,
+} from "lucide-react";
+import QuizPage from "./components/QuizPage";
+
+const iconMap = {
+  Brain, Server, Container, Activity, HelpCircle, Terminal,
+  Shield, Cloud, GitBranch, Database, Layers, BarChart, Globe, Wrench, Link,
+};
+
+// ─── LocalStorage ─────────────────────────────────────────────────────────────
+const STORAGE_KEY = "asd-revision-progress";
+const loadProgressFromStorage = () => {
+  try { const s = localStorage.getItem(STORAGE_KEY); return s ? JSON.parse(s) : {}; }
+  catch { return {}; }
+};
+const saveProgressToStorage = (progress) => {
+  try { localStorage.setItem(STORAGE_KEY, JSON.stringify(progress)); } catch { /* ignore */ }
+};
+
+// ─── Device detection (computed once, stable) ────────────────────────────────
+const IS_ANDROID = /Android/i.test(navigator.userAgent);
+const IS_MOBILE  = /iPhone|iPad|iPod|Android/i.test(navigator.userAgent);
+
+// ─── Global cancel token ──────────────────────────────────────────────────────
+// Incremented on every new speakText() call so stale onend/onerror callbacks
+// from the previous utterance become no-ops.
+let gToken = 0;
+
+// ─── Audio context unlock for mobile (Chrome/Android, Safari/iOS) ─────────────
+// Les navigateurs mobiles bloquent l'autoplay audio tant qu'il n'y a pas eu
+// d'interaction utilisateur directe. On resume le contexte audio au premier clic.
+let audioUnlocked = false;
+
+async function unlockAudio() {
+  if (audioUnlocked) return;
+  try {
+    const AudioContext = window.AudioContext || window.webkitAudioContext;
+    if (AudioContext) {
+      const ctx = new AudioContext();
+      if (ctx.state === 'suspended') {
+        await ctx.resume();
+      }
+      ctx.close();
+    }
+    audioUnlocked = true;
+    console.log('Audio context unlocked for mobile');
+  } catch (e) {
+    console.warn('Could not unlock audio context:', e);
+  }
+}
+
+// Attacher le deblocage au premier clic utilisateur (garanti sur mobile)
+if (typeof window !== 'undefined') {
+  const unlockHandler = () => { unlockAudio(); };
+  window.addEventListener('pointerup', unlockHandler, { once: true });
+  window.addEventListener('touchend', unlockHandler, { once: true });
+  window.addEventListener('click', unlockHandler, { once: true });
+}
+
+// ─── Text helpers ─────────────────────────────────────────────────────────────
+const MAX_CHUNK = IS_ANDROID ? 130 : 190;
+
+function chunkText(text) {
+  if (!text) return [];
+  const sentences = text.match(/[^.!?\n]+[.!?\n]+|[^.!?\n]+$/g) || [text];
+  const out = [];
+  for (const raw of sentences) {
+    const s = raw.trim();
+    if (!s) continue;
+    if (s.length <= MAX_CHUNK) { out.push(s); continue; }
+    const parts = s.split(/,\s+/);
+    let buf = "";
+    for (const p of parts) {
+      const c = buf ? buf + ", " + p : p;
+      if (c.length > MAX_CHUNK && buf) { out.push(buf.trim()); buf = p; }
+      else buf = c;
+    }
+    if (buf.trim()) {
+      if (buf.length > MAX_CHUNK) {
+        const words = buf.split(" "); let w = "";
+        for (const word of words) {
+          const c = w ? w + " " + word : word;
+          if (c.length > MAX_CHUNK && w) { out.push(w.trim()); w = word; }
+          else w = c;
+        }
+        if (w.trim()) out.push(w.trim());
+      } else { out.push(buf.trim()); }
+    }
+  }
+  return out.filter(Boolean);
+}
+
+function transformTextForAudio(text) {
+  if (!text) return "";
+  let t = text;
+  
+  // Transformations pour une prononciation naturelle avec voix française
+  // Objectif : aider la voix FR à prononcer l'anglais sans sonner artificiel
+  const rep = [
+    // === OUTILS & TECHNOLOGIES ===
+    [/\bKubernetes\b/gi, "Kubernetisse"],
+    [/\bDocker\b/gi, "Dokeur"],
+    [/\bTerraform\b/gi, "Terraformme"],
+    [/\bAnsible\b/gi, "Ansibole"],
+    [/\bPrometheus\b/gi, "Prométéusse"],
+    [/\bGrafana\b/gi, "Grafana"],
+    [/\bNginx\b/gi, "Endjinnex"],
+    [/\bGitHub\b/gi, "Guiteub"],
+    [/\bGit\b/g, "Guite"],
+    [/\bJenkins\b/gi, "Djenkinss"],
+    [/\bStreamlit\b/gi, "Strimlite"],
+    [/\bHashiCorp\b/gi, "Hachicorp"],
+    [/\bVault\b/gi, "Volte"],
+    
+    // === CONCEPTS DEVOPS ===
+    [/\bpipeline\b/gi, "païpe-laïne"],
+    [/\bcontainer\b/gi, "conteneur"],
+    [/\bcontainers\b/gi, "conteneurs"],
+    [/\bcluster\b/gi, "clusteur"],
+    [/\bdeployment\b/gi, "déploiement"],
+    [/\bworkflow\b/gi, "workflow"],
+    [/\brollback\b/gi, "rollback"],
+    [/\brolling update\b/gi, "rolling update"],
+    [/\bload balancer\b/gi, "load balanceur"],
+    [/\bfirewall\b/gi, "firewall"],
+    [/\bgateway\b/gi, "gateway"],
+    [/\bproxy\b/gi, "proxy"],
+    [/\bbackup\b/gi, "backup"],
+    [/\bcache\b/gi, "cache"],
+    [/\bpod\b/gi, "pod"],
+    [/\bpods\b/gi, "pods"],
+    [/\bnode\b/gi, "node"],
+    [/\bnodes\b/gi, "nodes"],
+    
+    // === GIT ===
+    [/\bcommit\b/gi, "commite"],
+    [/\bcommits\b/gi, "comites"],
+    [/\bbranch\b/gi, "branche"],
+    [/\bmerge\b/gi, "merge"],
+    [/\bpush\b/gi, "pouche"],
+    [/\bpull\b/gi, "poule"],
+    
+    // === FICHIERS & EXTENSIONS ===
+    [/\.tf\b/g, " point TF"],
+    [/\.yml\b/g, " point YAML"],
+    [/\.yaml\b/g, " point YAML"],
+    [/\.py\b/g, " point PY"],
+    [/\.js\b/g, " point JS"],
+    [/\.json\b/gi, " point JSON"],
+    [/\.sh\b/g, " point SH"],
+    [/\.env\b/g, " point ENV"],
+    [/\.md\b/g, " point MD"],
+    [/\bDockerfile\b/gi, "Dokeur file"],
+    [/\bplaybook\b/gi, "playbook"],
+    
+    // === RÉSEAU ===
+    [/\/32\b/g, " slash 32"],
+    [/\/24\b/g, " slash 24"],
+    [/\/16\b/g, " slash 16"],
+    [/\/0\b/g, " slash 0"],
+    [/0\.0\.0\.0/g, "0.0.0.0"],
+    
+    // === COMMANDES ===
+    [/\bdocker-compose\b/gi, "dokeur compose"],
+    [/\bfail2ban\b/gi, "fail 2 ban"],
+    [/\bkubectl\b/gi, "kioub control"],
+    [/\bsystemctl\b/gi, "système control"],
+    
+    // === SIGLES (épelés) ===
+    [/\bCI\/CD\b/gi, "CI CD"],
+    [/\bSSH\b/g, "S S H"],
+    [/\bAPI\b/g, "A P I"],
+    [/\bVPC\b/g, "V P C"],
+    [/\bEC2\b/g, "E C 2"],
+    [/\bS3\b/g, "S 3"],
+    [/\bRDS\b/g, "R D S"],
+    [/\bIAM\b/g, "I A M"],
+    [/\bCPU\b/g, "C P U"],
+    [/\bRAM\b/g, "RAM"],
+    [/\bDNS\b/g, "D N S"],
+    [/\bTLS\b/g, "T L S"],
+    [/\bSSL\b/g, "S S L"],
+    [/\bHTTPS\b/g, "H T T P S"],
+    [/\bHTTP\b/g, "H T T P"],
+    [/\bYAML\b/gi, "YAML"],
+    [/\bJSON\b/gi, "JSON"],
+    [/\bHCL\b/g, "H C L"],
+    [/\bSLI\b/g, "S L I"],
+    [/\bSLO\b/g, "S L O"],
+    [/\bSLA\b/g, "S L A"],
+    [/\bPromQL\b/gi, "Prom Q L"],
+    
+    // === DIVERS ===
+    [/\bt2\.micro\b/gi, "T2 micro"],
+    [/\bED25519\b/gi, "E D 25519"],
+    [/\bFree Tier\b/gi, "Free Tier"],
+    [/\bbucket\b/gi, "bucket"],
+    [/\bsubnet\b/gi, "subnet"],
+    [/\binstance\b/gi, "instance"],
+    [/\btrigger\b/gi, "trigger"],
+    [/\bsprint\b/gi, "sprint"],
+    [/\bbacklog\b/gi, "backlog"],
+    [/\bstandup\b/gi, "stand up"],
+    
+    // === NETTOYAGE ===
+    [/\s+/g, " "],
+  ];
+  
+  for (const [p, r] of rep) t = t.replace(p, r);
+  return t.trim();
+}
+
+function buildUtterance(chunk, voice, rate) {
+  const u = new SpeechSynthesisUtterance(chunk);
+  u.rate   = rate ?? 0.8;
+  u.pitch  = 1.05; // Slightly higher pitch for more natural sound
+  u.volume = 1;
+  if (voice) { u.voice = voice; u.lang = voice.lang || "fr-FR"; }
+  else { u.lang = "fr-FR"; }
+  return u;
+}
+
+// ─── App ──────────────────────────────────────────────────────────────────────
+export default function App() {
+  const [course]              = useState(COURSE_CONTENT);
+  const [currentSection,  setCurrentSection]  = useState(COURSE_CONTENT[0]);
+  const [completedSections, setCompletedSections] = useState(() => {
+    const saved = loadProgressFromStorage();
+    return new Set(Object.keys(saved).filter(k => saved[k]));
+  });
+  const [isPlaying,       setIsPlaying]       = useState(false);
+  const [currentBlockIndex, setCurrentBlockIndex] = useState(0);
+  const [voices,          setVoices]          = useState([]);
+  const [selectedVoice,   setSelectedVoice]   = useState(null);
+  const [speed,           setSpeed]           = useState(0.8);
+  const [sidebarOpen,     setSidebarOpen]     = useState(false);
+  const [progress,        setProgress]        = useState(0);
+  const [mode,            setMode]            = useState("audio");
+  const [ttsMode]         = useState("edge");
+  const [edgeVoices,      setEdgeVoices]      = useState([]);
+  const [selectedEdgeVoice, setSelectedEdgeVoice] = useState("fr-FR-HenriNeural");
+  const [isLoadingAudio,  setIsLoadingAudio]  = useState(false);
+
+  const synthRef          = useRef(window.speechSynthesis);
+  const audioRef          = useRef(null); // For Edge TTS audio element
+  const continuousRef     = useRef(false);
+  const currentIndexRef   = useRef(0);
+  const primedRef         = useRef(false); // Android first-play unlock
+
+  // Refs that shadow state so async callbacks always read the latest value
+  // without needing to be in the dependency array of useCallback.
+  const voiceRef          = useRef(null);
+  const speedRef          = useRef(speed);
+  const sectionRef        = useRef(currentSection);
+
+  useEffect(() => { voiceRef.current   = selectedVoice;  }, [selectedVoice]);
+  useEffect(() => { speedRef.current   = speed;          }, [speed]);
+  useEffect(() => { sectionRef.current = currentSection; }, [currentSection]);
+
+  // ── Voice loading - Only best quality voices ────────────────────────────────
+  const [voiceGenders, setVoiceGenders] = useState({});
+  
+  useEffect(() => {
+    const synth = synthRef.current;
+    const load = () => {
+      const all = synth.getVoices();
+      if (!all.length) return;
+      
+      // Filtrer les voix françaises (exclure fr-CA)
+      const frVoices = all.filter(v => 
+        v.lang?.toLowerCase().startsWith("fr") && 
+        !v.lang?.toLowerCase().includes("ca")
+      );
+      
+      if (!frVoices.length) {
+        setVoices(all.slice(0, 2));
+        setSelectedVoice(all[0]);
+        return;
+      }
+      
+      // Mots-clés pour identifier le genre
+      const maleKeywords = ['male', 'homme', 'thomas', 'pierre', 'paul', 'henri', 'claude', 'alain', 'jacques', 'olivier', 'luca', 'mathieu', 'lucas'];
+      const femaleKeywords = ['female', 'femme', 'amelie', 'amélie', 'marie', 'denise', 'lea', 'léa', 'celine', 'céline', 'aurelie', 'aurélie', 'virginie', 'sophie', 'julie', 'audrey', 'hortense', 'caroline'];
+      
+      const isMaleVoice = (v) => maleKeywords.some(k => v.name.toLowerCase().includes(k));
+      const isFemaleVoice = (v) => femaleKeywords.some(k => v.name.toLowerCase().includes(k));
+      
+      // Trouver la meilleure voix homme et femme
+      const findBestVoice = (isMale) => {
+        const checkGender = isMale ? isMaleVoice : isFemaleVoice;
+        
+        // 1. Google (meilleure qualité)
+        let voice = frVoices.find(v => v.name.toLowerCase().includes('google') && checkGender(v));
+        if (voice) return { voice, gender: isMale ? 'male' : 'female' };
+        
+        // 2. Microsoft
+        voice = frVoices.find(v => v.name.toLowerCase().includes('microsoft') && checkGender(v));
+        if (voice) return { voice, gender: isMale ? 'male' : 'female' };
+        
+        // 3. Any with gender keyword
+        voice = frVoices.find(v => checkGender(v));
+        if (voice) return { voice, gender: isMale ? 'male' : 'female' };
+        
+        return null;
+      };
+      
+      const maleResult = findBestVoice(true);
+      const femaleResult = findBestVoice(false);
+      
+      // Build final voice list (keep original voice objects!)
+      const finalVoices = [];
+      const genders = {};
+      
+      if (maleResult) {
+        finalVoices.push(maleResult.voice);
+        genders[maleResult.voice.name] = 'male';
+      }
+      if (femaleResult && femaleResult.voice !== maleResult?.voice) {
+        finalVoices.push(femaleResult.voice);
+        genders[femaleResult.voice.name] = 'female';
+      }
+      
+      // Fallback if no gender-specific found - take first 2 voices
+      if (finalVoices.length === 0) {
+        const google = frVoices.find(v => v.name.toLowerCase().includes('google'));
+        const microsoft = frVoices.find(v => v.name.toLowerCase().includes('microsoft'));
+        if (google) {
+          finalVoices.push(google);
+          genders[google.name] = 'unknown';
+        }
+        if (microsoft && microsoft !== google) {
+          finalVoices.push(microsoft);
+          genders[microsoft.name] = 'unknown';
+        }
+        if (finalVoices.length === 0) {
+          frVoices.slice(0, 2).forEach((v, i) => {
+            finalVoices.push(v);
+            genders[v.name] = i === 0 ? 'male' : 'female';
+          });
+        }
+      }
+      
+      setVoices(finalVoices);
+      setVoiceGenders(genders);
+      
+      // Set default: prefer male voice
+      setSelectedVoice(prev => {
+        if (prev && finalVoices.some(v => v.name === prev.name)) return prev;
+        const male = finalVoices.find(v => genders[v.name] === 'male');
+        return male || finalVoices[0];
+      });
+    };
+    
+    load();
+    if (synth.onvoiceschanged !== undefined) synth.onvoiceschanged = load;
+    const timers = [100, 300, 700, 1500, 3000].map(ms => setTimeout(load, ms));
+    return () => { timers.forEach(clearTimeout); synth.onvoiceschanged = null; };
+  }, []);
+
+  // ── Load Edge TTS voices ────────────────────────────────────────────────────
+  useEffect(() => {
+    const loadEdgeVoices = async () => {
+      try {
+        const API_BASE = process.env.REACT_APP_BACKEND_URL || "";
+        const res = await fetch(`${API_BASE}/api/tts/voices`);
+        if (res.ok) {
+          const data = await res.json();
+          setEdgeVoices(data);
+        }
+      } catch (e) {
+        console.log("Edge voices not available, using defaults");
+        setEdgeVoices([
+          { name: "fr-FR-DeniseNeural", gender: "Female", locale: "fr-FR" },
+          { name: "fr-FR-HenriNeural", gender: "Male", locale: "fr-FR" },
+        ]);
+      }
+    };
+    loadEdgeVoices();
+  }, []);
+
+  // ── Cleanup on unmount ─────────────────────────────────────────────────────
+  useEffect(() => {
+    const synth = synthRef.current;
+    return () => { try { synth.cancel(); } catch { /* ignore */ } };
+  }, []);
+
+  // ── Wake Lock : empêche l'écran de s'éteindre pendant la lecture ───────────
+  // Indispensable pour l'usage en voiture : sans ça, l'écran se verrouille au
+  // bout de ~30s et speechSynthesis se coupe sur la plupart des Android.
+  const wakeLockRef = useRef(null);
+
+  useEffect(() => {
+    if (!("wakeLock" in navigator)) return; // API non supportée → on ignore
+
+    const requestLock = async () => {
+      try {
+        wakeLockRef.current = await navigator.wakeLock.request("screen");
+        wakeLockRef.current.addEventListener("release", () => {
+          wakeLockRef.current = null;
+        });
+      } catch (err) {
+        // Souvent : "NotAllowedError" si l'onglet n'est pas visible. Sans gravité.
+        console.warn("WakeLock indisponible:", err?.message || err);
+      }
+    };
+
+    const releaseLock = async () => {
+      try { await wakeLockRef.current?.release(); } catch { /* ignore */ }
+      wakeLockRef.current = null;
+    };
+
+    // Réacquisition auto quand on revient sur l'onglet pendant la lecture
+    const onVisibility = () => {
+      if (document.visibilityState === "visible" && isPlaying && !wakeLockRef.current) {
+        requestLock();
+      }
+    };
+
+    if (isPlaying) {
+      requestLock();
+      document.addEventListener("visibilitychange", onVisibility);
+    }
+
+    return () => {
+      document.removeEventListener("visibilitychange", onVisibility);
+      releaseLock();
+    };
+  }, [isPlaying]);
+
+  // ── speakText using Browser TTS ──────────────────────────────────────────
+  const speakText = useCallback((rawText, onDone) => {
+    const synth  = synthRef.current;
+    const voice  = voiceRef.current;
+    const rate   = speedRef.current;
+    const token  = ++gToken;
+    const stale  = () => token !== gToken;
+
+    synth.cancel();
+
+    const chunks = chunkText(transformTextForAudio(rawText));
+    if (!chunks.length) { onDone?.(); return; }
+
+    const queueAll = () => {
+      if (stale()) return;
+      chunks.forEach((chunk, idx) => {
+        const u      = buildUtterance(chunk, voice, rate);
+        const isLast = idx === chunks.length - 1;
+
+        u.onstart = () => { if (!stale()) setIsPlaying(true); };
+
+        u.onend = () => {
+          if (stale()) return;
+          if (isLast) { setIsPlaying(false); onDone?.(); }
+        };
+
+        u.onerror = (e) => {
+          if (e?.error === "canceled" || e?.error === "interrupted") return;
+          if (stale()) return;
+          console.warn("TTS chunk", idx, e?.error);
+          if (isLast) { setIsPlaying(false); onDone?.(); }
+        };
+
+        try { synth.speak(u); } catch (err) { console.warn("speak() threw:", err); }
+      });
+    };
+
+    if (IS_ANDROID && !primedRef.current) {
+      primedRef.current = true;
+      const primer  = buildUtterance(".", voice, 1);
+      primer.volume = 0.01;
+      const afterPrimer = () => setTimeout(queueAll, 80);
+      primer.onend  = afterPrimer;
+      primer.onerror = afterPrimer;
+      setTimeout(() => { if (!stale()) synth.speak(primer); }, 100);
+    } else {
+      setTimeout(queueAll, IS_ANDROID ? 110 : 30);
+    }
+  }, []);
+
+
+  // ── speakText using Edge TTS (natural voice) ────────────────────────────────
+  const playEdgeAudio = useCallback(async (sectionId, blockIndex, onDone) => {
+    // Deblocage audio mobile
+    unlockAudio();
+
+    if (!continuousRef.current) {
+      onDone?.();
+      return;
+    }
+    setIsLoadingAudio(true);
+    setIsPlaying(true);
+    try {
+      const API_BASE = process.env.REACT_APP_BACKEND_URL || "";
+      const url = `${API_BASE}/api/tts/block/${sectionId}/${blockIndex}?voice=${encodeURIComponent(selectedEdgeVoice)}&rate=-10%`;
+      const res = await fetch(url);
+      if (!res.ok) throw new Error("Edge TTS failed: " + res.status);
+      const blob = await res.blob();
+      const audioUrl = URL.createObjectURL(blob);
+
+      // Réutiliser un seul élément audio (plus compatible Chrome/autoplay)
+      const audio = audioRef.current || new Audio();
+      audioRef.current = audio;
+      audio.src = audioUrl;
+      audio.load();
+      await audio.play();
+
+      audio.onended = () => {
+        URL.revokeObjectURL(audioUrl);
+        setIsLoadingAudio(false);
+        // Ne pas toucher à isPlaying ici : on reste en lecture pour l'enchaînement
+        onDone?.();
+      };
+
+      audio.onerror = () => {
+        URL.revokeObjectURL(audioUrl);
+        console.error("Audio element error on Chrome/Edge");
+        setIsPlaying(false);
+        setIsLoadingAudio(false);
+        onDone?.();
+      };
+    } catch (e) {
+      console.error("Edge TTS error", e);
+      setIsPlaying(false);
+      setIsLoadingAudio(false);
+      onDone?.();
+    }
+  }, [selectedEdgeVoice]);
+
+  // ── Block text ─────────────────────────────────────────────────────────────
+  const getBlockText = useCallback((block) => {
+    // Special handling for tool_card type
+    if (block.type === "tool_card") {
+      return `Outil : ${block.tool}. ` +
+             `Analogie : ${block.analogy}. ` +
+             `Ce que ça fait : ${block.description}. ` +
+             `Pourquoi c'est utile : ${block.why_useful}. ` +
+             `Lien suivant : ${block.link_next}`;
+    }
+    
+    let t = "";
+    if (block.title)    t += block.title + ". ";
+    if (block.question) t += block.question + " ";
+    if (block.answer)   t += "Réponse : " + block.answer;
+    else if (block.text) t += block.text;
+    return t;
+  }, []);
+
+  // ── Section completion ─────────────────────────────────────────────────────
+  const markSectionComplete = useCallback(() => {
+    const section = sectionRef.current;
+    if (!section) return;
+    setCompletedSections(prev => {
+      const next = new Set([...prev, section.id]);
+      const data = {}; next.forEach(id => (data[id] = true));
+      saveProgressToStorage(data);
+      return next;
+    });
+  }, []);
+
+  // ── Continuous play (avec enchaînement section → section) ──────────────────
+  const playFrom = useCallback((idx) => {
+    const section = sectionRef.current;
+    if (!section || !continuousRef.current) return;
+
+    // Fin de la section atteinte
+    if (idx >= section.content.length) {
+      markSectionComplete();
+
+      // Cherche la section suivante dans le cours
+      const courseIdx = course.findIndex(s => s.id === section.id);
+      const hasNext   = courseIdx >= 0 && courseIdx < course.length - 1;
+
+      if (hasNext) {
+        const next = course[courseIdx + 1];
+        // Bascule automatique sur la section suivante
+        sectionRef.current = next;
+        setCurrentSection(next);
+        setCurrentBlockIndex(0);
+        currentIndexRef.current = 0;
+        setProgress(0);
+        // Petite pause pour respirer entre 2 sections, puis on relance
+        setTimeout(() => {
+          if (continuousRef.current) playFrom(0);
+        }, 800);
+      } else {
+        // Dernière section du cours → stop propre
+        continuousRef.current = false;
+        setIsPlaying(false);
+      }
+      return;
+    }
+
+    currentIndexRef.current = idx;
+    setCurrentBlockIndex(idx);
+    setProgress(((idx + 1) / section.content.length) * 100);
+
+    const text = getBlockText(section.content[idx]);
+    if (!text.trim()) { playFrom(idx + 1); return; } // skip empty blocks
+
+    // Vérifier que la lecture continue est toujours active avant de lancer le bloc
+    if (!continuousRef.current) return;
+
+    if (ttsMode === "edge") {
+      playEdgeAudio(section.id, idx, () => {
+        // Vérifier que l'enchaînement n'a pas été arrêté entre-temps
+        if (continuousRef.current) {
+          setTimeout(() => {
+            if (continuousRef.current) playFrom(idx + 1);
+          }, 600);
+        }
+      });
+    } else {
+      speakText(text, () => {
+        if (continuousRef.current) {
+          setTimeout(() => playFrom(idx + 1), IS_ANDROID ? 450 : 270);
+        }
+      });
+    }
+  }, [course, getBlockText, speakText, playEdgeAudio, markSectionComplete, ttsMode]);
+
+  // ── Handlers ───────────────────────────────────────────────────────────────
+  const handleBlockClick = useCallback((index) => {
+    currentIndexRef.current = index;
+    setCurrentBlockIndex(index);
+    setProgress(((index + 1) / sectionRef.current.content.length) * 100);
+
+    // Si lecture continue active : on saute au bloc choisi SANS casser la chaîne
+    if (continuousRef.current) {
+      synthRef.current.cancel();
+      setTimeout(() => playFrom(index), 100);
+      return;
+    }
+
+    // Sinon : lecture unique du bloc
+    const block = sectionRef.current.content[index];
+    const blockText = getBlockText(block);
+    if (!blockText.trim()) return;
+    if (ttsMode === "edge") {
+      playEdgeAudio(sectionRef.current.id, index, () => {});
+    } else {
+      speakText(blockText, () => {});
+    }
+  }, [speakText, getBlockText, playFrom, playEdgeAudio, ttsMode]);
+
+  const togglePlay = useCallback(() => {
+    // Deblocage audio mobile (Chrome Android, Safari iOS)
+    unlockAudio();
+
+    if (isPlaying) {
+      synthRef.current.cancel();
+      try { if (audioRef.current) { audioRef.current.pause(); } } catch {}
+      continuousRef.current = false;
+      setIsPlaying(false);
+      setIsLoadingAudio(false);
+    } else {
+      continuousRef.current = true;
+      setIsPlaying(true);
+      // Préparer le contexte audio sur Chrome (autoplay policy)
+      try { if (audioRef.current) audioRef.current.play().catch(() => {}); } catch {}
+      playFrom(currentBlockIndex);
+    }
+  }, [isPlaying, currentBlockIndex, playFrom]);
+
+  const stopPlayback = useCallback(() => {
+    synthRef.current.cancel();
+    try { if (audioRef.current) { audioRef.current.pause(); audioRef.current.src = ""; } } catch {}
+    continuousRef.current   = false;
+    currentIndexRef.current = 0;
+    setIsPlaying(false);
+    setCurrentBlockIndex(0);
+    setProgress(0);
+    setIsLoadingAudio(false);
+  }, []);
+
+  const changeSection = useCallback((section) => {
+    stopPlayback();
+    setCurrentSection(section);
+    setCurrentBlockIndex(0);
+    currentIndexRef.current = 0;
+    setProgress(0);
+    setSidebarOpen(false);
+  }, [stopPlayback]);
+
+  const navigateSection = useCallback((dir) => {
+    const idx = course.findIndex(s => s.id === sectionRef.current?.id);
+    const nxt = idx + dir;
+    if (nxt >= 0 && nxt < course.length) changeSection(course[nxt]);
+  }, [course, changeSection]);
+
+  const changeSpeed = useCallback((val) => {
+    const n = parseFloat(val);
+    speedRef.current = n;
+    setSpeed(n);
+    if (isPlaying) stopPlayback();
+  }, [isPlaying, stopPlayback]);
+
+  const changeVoice = useCallback((name) => {
+    const v = voices.find(v => v.name === name);
+    if (!v) return;
+    voiceRef.current = v;
+    setSelectedVoice(v);
+    if (isPlaying) stopPlayback();
+  }, [voices, isPlaying, stopPlayback]);
+
+  const getShortVoiceName = (voice) => {
+    if (!voice) return "Voix";
+    const n = voice.name;
+    if (n.includes("Google"))    return n.replace("Google ", "");
+    if (n.includes("Microsoft")) return n.split(" ").slice(1, 3).join(" ");
+    return n.length > 20 ? n.substring(0, 18) + "…" : n;
+  };
+
+  // ── Block renderer ─────────────────────────────────────────────────────────
+  const renderBlock = (block, index) => {
+    const active  = index === currentBlockIndex && isPlaying;
+    const current = index === currentBlockIndex;
+
+    // Special rendering for tool_card type
+    if (block.type === "tool_card") {
+      return (
+        <div
+          key={index}
+          data-testid={`content-block-${index}`}
+          className={`tool-card${active ? " speech-highlight" : ""}${current && !isPlaying ? " block-current" : ""}`}
+          onClick={() => handleBlockClick(index)}
+          title="Cliquez pour écouter"
+        >
+          <div className="block-play-indicator"><Volume1 size={16} /></div>
+          <div className="tool-card-header">
+            <span className="tool-emoji">{block.emoji}</span>
+            <div className="tool-info">
+              <h3 className="tool-name">{block.tool}</h3>
+              <p className="tool-analogy">{block.analogy}</p>
+            </div>
+          </div>
+          <div className="tool-card-body">
+            <div className="tool-row">
+              <span className="tool-label">Ce que ça fait</span>
+              <p className="tool-value">{block.description}</p>
+            </div>
+            <div className="tool-row">
+              <span className="tool-label">Pourquoi c'est utile</span>
+              <p className="tool-value">{block.why_useful}</p>
+            </div>
+            <div className="tool-row tool-link">
+              <span className="tool-label">Lien suivant</span>
+              <p className="tool-value">{block.link_next} <span className="next-arrow">↓ {block.next_tool}</span></p>
+            </div>
+          </div>
+        </div>
+      );
+    }
+
+    return (
+      <div
+        key={index}
+        data-testid={`content-block-${index}`}
+        className={`content-block content-${block.type}${active ? " speech-highlight" : ""}${current && !isPlaying ? " block-current" : ""}`}
+        onClick={() => handleBlockClick(index)}
+        title="Cliquez pour écouter"
+      >
+        <div className="block-play-indicator"><Volume1 size={16} /></div>
+        <div className="block-content-wrapper">
+          {block.title && <h3 className="block-title">{block.title}</h3>}
+          {block.question && <p className="qa-question">{block.question}</p>}
+          {block.answer && <p className="qa-answer">{block.answer}</p>}
+          {block.text && !block.answer && <p className="block-text">{block.text}</p>}
+        </div>
+      </div>
+    );
+  };
+
+  const sectionIdx       = course.findIndex(s => s.id === currentSection?.id);
+  const completionPct    = Math.round((completedSections.size / course.length) * 100);
+
+  // ── JSX ────────────────────────────────────────────────────────────────────
+  if (mode === "quiz") {
+    return <QuizPage onBack={() => setMode("audio")} />;
+  }
+
+  return (
+    <div className="app-container" data-testid="app-container">
+      <button className="mobile-menu-btn" onClick={() => setSidebarOpen(!sidebarOpen)} aria-label="Menu">
+        {sidebarOpen ? <X size={24} /> : <Menu size={24} />}
+      </button>
+
+      <aside className={`sidebar ${sidebarOpen ? "open" : ""}`} data-testid="sidebar">
+        <div className="sidebar-header">
+          <h1 className="font-heading text-xl font-bold">Révision ASD</h1>
+          <p className="font-mono text-xs mt-1 uppercase tracking-wider">Titre Pro Juin 2026</p>
+          <div className="progress-summary">
+            <div className="progress-bar-small">
+              <div className="progress-fill-small" style={{ width: `${completionPct}%` }} />
+            </div>
+            <span className="progress-text">{completionPct}% complété</span>
+          </div>
+          <button
+            onClick={() => { setMode("quiz"); setSidebarOpen(false); }}
+            data-testid="open-quiz-btn"
+            style={{
+              marginTop: "0.85rem",
+              width: "100%",
+              padding: "0.6rem 0.9rem",
+              background: "#ED7D31",
+              color: "white",
+              border: "none",
+              borderRadius: 8,
+              cursor: "pointer",
+              fontSize: "0.85rem",
+              fontWeight: 700,
+              display: "flex",
+              alignItems: "center",
+              justifyContent: "center",
+              gap: "0.5rem",
+              boxShadow: "0 2px 8px rgba(237,125,49,0.35)",
+            }}
+          >
+            📝 Entraînement Dossier Projet : QCM
+          </button>
+        </div>
+        <ScrollArea className="sidebar-nav">
+          <nav>
+            {course.map((section, idx) => {
+              const Icon   = iconMap[section.icon] || Brain;
+              const active = currentSection?.id === section.id;
+              const done   = completedSections.has(section.id);
+              return (
+                <div key={section.id}
+                  className={`nav-item${active ? " active" : ""}${done ? " completed" : ""}`}
+                  onClick={() => changeSection(section)}>
+                  <span className="nav-number">{idx + 1}</span>
+                  <Icon size={18} />
+                  <span className="flex-1 font-body text-sm nav-title">{section.title}</span>
+                  {done && <CheckCircle2 size={16} className="text-green-600" />}
+                </div>
+              );
+            })}
+          </nav>
+        </ScrollArea>
+      </aside>
+
+      <main className="main-content" data-testid="main-content">
+        <div className="content-area">
+          {currentSection && (<>
+            <div className="section-header">
+              <span className="section-number">Section {sectionIdx + 1} / {course.length}</span>
+              <h2 className="section-title">{currentSection.title}</h2>
+              <p className="section-hint">
+                {IS_MOBILE ? "Appuyez sur un bloc pour l'écouter" : "Cliquez sur un bloc pour l'écouter"}
+              </p>
+            </div>
+            <div data-testid="content-blocks">
+              {currentSection.content.map((block, index) => renderBlock(block, index))}
+            </div>
+            <div className="section-nav">
+              <Button variant="outline" onClick={() => navigateSection(-1)}
+                disabled={sectionIdx <= 0} className="nav-btn">
+                <ChevronLeft size={16} /> Précédent
+              </Button>
+              <Button variant="outline" onClick={() => navigateSection(1)}
+                disabled={sectionIdx >= course.length - 1} className="nav-btn">
+                Suivant <ChevronRight size={16} />
+              </Button>
+            </div>
+          </>)}
+        </div>
+      </main>
+
+      <div className="audio-player" data-testid="audio-player">
+        <div className="player-controls">
+          <Button size="icon" variant={isPlaying ? "default" : "outline"}
+            onClick={togglePlay} className="h-12 w-12 play-btn"
+            title={isPlaying ? "Pause" : "Lecture continue"}>
+            {isPlaying ? <Pause size={24} /> : <Play size={24} />}
+          </Button>
+          <Button size="icon" variant="outline" onClick={stopPlayback}
+            className="h-10 w-10" title="Stop">
+            <Square size={18} />
+          </Button>
+        </div>
+
+        <div className="player-info">
+          <p className="player-title">{currentSection?.title || "Sélectionnez une section"}</p>
+          <p className="player-progress">
+            Bloc {currentBlockIndex + 1} / {currentSection?.content?.length || 0}
+          </p>
+          <div className="progress-bar">
+            <div className="progress-fill" style={{ width: `${progress}%` }} />
+          </div>
+        </div>
+
+        <div className="player-settings">
+          <div className="setting-group">
+            <Volume2 size={16} className="setting-icon" />
+          {!audioUnlocked && IS_MOBILE && (
+            <Button size="sm" variant="destructive" onClick={unlockAudio} className="w-full mb-2">
+              Activer l audio (requis sur mobile)
+            </Button>
+          )}
+          </div>
+          <div className="setting-group">
+            <Volume2 size={16} className="setting-icon" />
+            <span className="engine-badge">{ttsMode === "edge" ? "🔊 Edge TTS (naturel)" : "🌐 Navigateur"}</span>
+            <Select
+              value={ttsMode === "edge" ? selectedEdgeVoice : (selectedVoice?.name || "")}
+              onValueChange={v => {
+                if (ttsMode === "edge") setSelectedEdgeVoice(v);
+                else setSelectedVoice(voices.find(x => x.name === v));
+              }}
+            >
+              <SelectTrigger className="voice-select"><SelectValue placeholder="Voix" /></SelectTrigger>
+              <SelectContent className="z-[70]">
+                {ttsMode === "edge"
+                  ? (edgeVoices.length ? edgeVoices : [
+                      { name: "fr-FR-HenriNeural", gender: "Male", locale: "fr-FR" },
+                      { name: "fr-FR-DeniseNeural", gender: "Female", locale: "fr-FR" },
+                    ]).map(v => (
+                      <SelectItem key={v.name} value={v.name}>
+                        {v.gender === "Male" ? "🎙️ Homme" : "🎙️ Femme"} — {v.name}
+                      </SelectItem>
+                    ))
+                  : voices.map(v => (
+                      <SelectItem key={v.name} value={v.name}>
+                        {voiceGenders[v.name] === 'male' ? "🎙️ Homme" : voiceGenders[v.name] === 'female' ? "🎙️ Femme" : "🎙️ Voix"} — {v.name}
+                      </SelectItem>
+                    ))}
+              </SelectContent>
+            </Select>
+          </div>
+          <div className="setting-group">
+            <Select value={speed.toString()} onValueChange={changeSpeed}>
+              <SelectTrigger className="speed-select"><SelectValue /></SelectTrigger>
+              <SelectContent className="z-[70]">
+                {[0.5, 0.6, 0.7, 0.8, 0.9, 1, 1.25, 1.5].map(s =>
+                  <SelectItem key={s} value={s.toString()}>{s}x</SelectItem>)}
+              </SelectContent>
+            </Select>
+          </div>
+        </div>
+      </div>
+    </div>
+  );
+}
